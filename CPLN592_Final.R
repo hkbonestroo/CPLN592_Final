@@ -36,6 +36,7 @@ library(tigris)
 library(tidycensus)
 library(viridis)
 library(riem)
+
 options(scipen=999)
 options(tigris_class = "sf")
 
@@ -121,6 +122,43 @@ nn_function <- function(measureFrom,measureTo,k) {
 
 census_api_key("91a259a2aaac3093a636d189040e0ff263fc823b", overwrite = TRUE)
 
+#load sf tracts
+sfCensus <- 
+  get_acs(geography = "tract", 
+          variables = c("B01003_001", "B19013_001", 
+                        "B02001_002", "B08013_001",
+                        "B08012_001", "B08301_001", 
+                        "B08301_010", "B01002_001"), 
+          year = 2018, 
+          state = "CA", 
+          geometry = TRUE, 
+          county=c("San Francisco"),
+          output = "wide") %>%
+  rename(Total_Pop =  B01003_001E,
+         Med_Inc = B19013_001E,
+         Med_Age = B01002_001E,
+         White_Pop = B02001_002E,
+         Travel_Time = B08013_001E,
+         Num_Commuters = B08012_001E,
+         Means_of_Transport = B08301_001E,
+         Total_Public_Trans = B08301_010E) %>%
+  dplyr::select(Total_Pop, Med_Inc, White_Pop, Travel_Time,
+         Means_of_Transport, Total_Public_Trans,
+         Med_Age,
+         GEOID, geometry) %>%
+  mutate(Percent_White = White_Pop / Total_Pop,
+         Mean_Commute_Time = Travel_Time / Total_Public_Trans,
+         Percent_Taking_Public_Trans = Total_Public_Trans / Means_of_Transport)
+sfTracts <- 
+  sfCensus %>%
+  as.data.frame() %>%
+  distinct(GEOID, .keep_all = TRUE) %>%
+  dplyr::select(GEOID, geometry) %>% 
+  st_sf
+
+`%nin%` = Negate(`%in%`)
+sfTracts <- subset(sfTracts, GEOID %nin% c("06075980401","06075017902","06075017902","06075017902"))
+
 #load parking data
 
 ParkingMeters.dat <- st_read("Mayparking.csv")
@@ -162,9 +200,80 @@ ParkingMeters.sf<-
   ParkingMeters.sf%>%
   rename(StationID=POST_ID)
 ParkingMeters.sf <- merge(ParkingMeters, ParkingMeters.sf, by='StationID')
+ParkingMeters.sf$LONGITUDE2 <-ParkingMeters.sf$LONGITUDE
+ParkingMeters.sf$LATITUDE2 <- ParkingMeters.sf$LATITUDE
+
 #join 
 
 ParkingMeters.sf <- ParkingMeters.sf[!(ParkingMeters.sf$LATITUDE == ""), ]
 ParkingMeters.sf <- ParkingMeters.sf[!(ParkingMeters.sf$LONGITUDE == ""), ]
 ParkingMeters.sf <- st_as_sf(x = ParkingMeters.sf, coords = c("LONGITUDE","LATITUDE"),crs = "+proj=longlat +crs = 'EPSG:6339'")
 ParkingMeters.sf<- st_transform(ParkingMeters.sf,"EPSG:6339")
+
+ParkingMeters.sf <-
+  ParkingMeters.sf%>%
+  dplyr::select(StationID,STREET_BLOCK,POST_ID,Address2,SESSION_START_DT,SESSION_END_DT,GROSS_PAID_AMT,interval60,interval15,week,dotw,ParkTime,
+                ParkTimeMin2,GROSS_PAID_AMT2,ParkingRate,Neighborhoods,COLLECTION_SUBROUTE,LONGITUDE2,LATITUDE2)
+# Exploratory
+ParkingMeters.sf.nogeometry <-st_drop_geometry(ParkingMeters.sf)
+ggplot(ParkingMeters.sf.nogeometry %>%
+         group_by(interval60) %>%
+         tally())+
+  geom_line(aes(x = interval60, y = n))+
+  labs(title="Parking Sessions per Hour. San Francisco, May, 2018",
+       x="Date", 
+       y="Number of Parking Sessions")+
+  plotTheme()
+
+ParkingMeters.sf.nogeometry %>%
+  mutate(time_of_day = case_when(hour(interval60) < 7 | hour(interval60) > 18 ~ "Overnight",
+                                 hour(interval60) >= 7 & hour(interval60) < 10 ~ "AM Rush",
+                                 hour(interval60) >= 10 & hour(interval60) < 15 ~ "Mid-Day",
+                                 hour(interval60) >= 15 & hour(interval60) <= 18 ~ "PM Rush"))%>%
+  group_by(interval60, StationID, time_of_day) %>%
+  tally()%>%
+  group_by(StationID, time_of_day)%>%
+  summarize(mean_trips = mean(n))%>%
+  ggplot()+
+  geom_histogram(aes(mean_trips), binwidth = 1)+
+  labs(title="Mean Number of Hourly Parking Sessions Per Block. San Frrancisco, May, 2018",
+       x="Number of parking sessions", 
+       y="Frequency")+
+  facet_wrap(~time_of_day)+
+  plotTheme()
+
+ggplot(ParkingMeters.sf.nogeometry %>%
+         group_by(interval60, StationID) %>%
+         tally())+
+  geom_histogram(aes(n), binwidth = 5)+
+  labs(title="Parking Sessions per hr by block. San Francisco, May, 2018",
+       x="Number of Parking Sessions", 
+       y="Number of Blocks")+
+  plotTheme()
+
+ggplot(ParkingMeters.sf.nogeometry %>% mutate(hour = hour(SESSION_END_DT)))+
+  geom_freqpoly(aes(hour, color = dotw), binwidth = 1)+
+  labs(title="Parking Sessions in San Francisco, by day of the week, May, 2018",
+       x="Hour", 
+       y="Parking Session Count")+
+  plotTheme()
+
+ggplot()+
+  geom_sf(data = sfTracts %>%
+            st_transform(crs='EPSG:6339'))+
+  geom_point(data = ParkingMeters.sf %>% 
+               mutate(hour = hour(SESSION_END_DT),
+                      time_of_day = case_when(hour(interval60) < 7 | hour(interval60) > 18 ~ "Overnight",
+                                              hour(interval60) >= 7 & hour(interval60) < 10 ~ "AM Rush",
+                                              hour(interval60) >= 10 & hour(interval60) < 15 ~ "Mid-Day",
+                                              hour(interval60) >= 15 & hour(interval60) <= 18 ~ "PM Rush"))%>%
+               group_by(StationID,time_of_day) %>%
+               tally(),
+             aes(x=LONGITUDE2, y = LATITUDE2, color = n), 
+             fill = "transparent", alpha = 0.4, size = 0.3)+
+  scale_colour_viridis(direction = -1,
+                       discrete = FALSE, option = "D")+
+  ylim(min(ParkingMeters.sf$LATITUDE2), max(ParkingMeters.sf$LATITUDE2))+
+  xlim(min(ParkingMeters.sf$LONGITUDE2), max(ParkingMeters.sf$LONGITUDE2))+
+  labs(title="Bike share trips per hr by station. Chicago, May, 2018")+
+  mapTheme()
