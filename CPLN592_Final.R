@@ -36,6 +36,7 @@ library(tigris)
 library(tidycensus)
 library(viridis)
 library(riem)
+library(RSocrata)
 
 options(scipen=999)
 options(tigris_class = "sf")
@@ -326,6 +327,9 @@ ggplot()+
 #study panel stuff
 
 
+
+nrow(study.panel)  
+
 study.panel <- 
   expand.grid(interval60 = unique(ParkingMeters$interval60), 
               StationID = unique(ParkingMeters$StationID))
@@ -366,11 +370,56 @@ ride.panel <-
          lag12Hours = dplyr::lag(Trip_Count,12),
          lag1day = dplyr::lag(Trip_Count,24))
 
+ride.panel <- 
+  left_join(ride.panel, sfCensus %>%
+              as.data.frame() %>%
+              select(-geometry), by = c("Origin.Tract" = "GEOID"))
+
+##Exposure Features 
+
+### Parks
+parks_al <- 
+  read.socrata("https://data.oaklandca.gov/resource/kq8i-6bzk.json") %>%
+  dplyr::select(Y = location_1.latitude, X = location_1.longitude) %>%
+  na.omit() %>%
+  st_as_sf(coords = c("X", "Y"), crs = 4326, agr = "constant") %>%
+  st_transform('ESRI:102241') %>%
+  mutate(Legend = "Park")
+
+parks_sf <-
+  st_read("C:/Users/agarw/Documents/MUSA508/MUSA508-Assignment3/Data/Recreation_and_Parks_Properties.csv") %>%
+  dplyr::select(Y = Latitude, X = Longitude) %>%
+  na.omit() %>%
+  st_as_sf(coords = c("X", "Y"), crs = 4326, agr = "constant") %>%
+  st_transform('ESRI:102241') %>%
+  mutate(Legend = "Park")
+#help :(
+as.data.frame(ride.panel) %>%
+  group_by(interval60) %>% 
+  summarise_at(vars(starts_with("lag"), "Trip_Count"), mean, na.rm = TRUE) %>%
+  gather(Variable, Value, -interval60, -Trip_Count) %>%
+  mutate(Variable = factor(Variable, levels=c("lagHour","lag2Hours","lag3Hours","lag4Hours",
+                                              "lag12Hours","lag1day")))%>%
+  group_by(Variable) %>%  
+  summarize(correlation = round(cor(Value, Trip_Count),2))
+
+as.data.frame(ride.panel) %>%
+  group_by(interval60) %>% 
+  summarise_at(vars("lagHour",  "lag2Hours", "lag3Hours", "lag4Hours","lag12Hours","lag1day","Trip_Count"), mean, na.rm = TRUE) %>%
+  gather(Variable, Value, -interval60, -Trip_Count) %>%
+  mutate(Variable = factor(Variable, levels=c("lagHour","lag2Hours","lag3Hours","lag4Hours",
+                                              "lag12Hours","lag1day")))%>%
+  group_by(Variable) %>%  
+  summarize(correlation = round(cor(Value, Trip_Count),2))
+
+
+ride.panel$dotw2 <-as.character(ride.panel$dotw)
+
 #split training test
 ride.Train <- subset(ride.panel, dotw %in% c("Mon","Tue","Wed"))
 ride.Test <- subset(ride.panel, dotw %in% c("Thu","Fri"))
 
-#something is wrong unsure
+#Parking session by week
 st_drop_geometry(rbind(
   mutate(ride.Train, Legend = "Training"), 
   mutate(ride.Test, Legend = "Testing"))) %>%
