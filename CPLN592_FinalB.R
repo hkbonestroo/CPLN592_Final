@@ -285,26 +285,29 @@ ggplot(ParkingMeter_census %>% mutate(hour = hour(SESSION_END_DT)))+
        y="Session Counts")+
   plotTheme()
 
-#not working
+ParkingMeter_census_plot <- ParkingMeter_census
+ParkingMeter_census_plot <- ParkingMeter_census_plot[!(ParkingMeter_census_plot$LATITUDE == ""), ]
+ParkingMeter_census_plot <- ParkingMeter_census_plot[!(ParkingMeter_census_plot$LONGITUDE == ""), ]
+ParkingMeter_census_plot <- st_as_sf(x = ParkingMeter_census_plot, coords = c("LONGITUDE2","LATITUDE2"),crs = "+proj=longlat +crs = 'EPSG:6339'")
+ParkingMeter_census_plot<- st_transform(ParkingMeter_census_plot,"EPSG:6339")
+#Parking By Block
 ggplot()+
   geom_sf(data = sfTracts %>%
-            st_transform(crs=4326), colour = '#efefef')+
-  geom_point(data = ParkingMeter_census %>% 
+            st_transform(crs='EPSG:6339'), colour = '#efefef')+
+  geom_sf(data = ParkingMeter_census_plot %>% 
                mutate(hour = hour(SESSION_END_DT),
                       time_of_day = case_when(hour(interval60) < 7 | hour(interval60) > 18 ~ "Overnight",
                                               hour(interval60) >= 7 & hour(interval60) < 10 ~ "AM Rush",
                                               hour(interval60) >= 10 & hour(interval60) < 15 ~ "Mid-Day",
                                               hour(interval60) >= 15 & hour(interval60) <= 18 ~ "PM Rush"))%>%
-               group_by(StationID, LATITUDE2, LONGITUDE2,time_of_day) %>%
+               group_by(StationID, time_of_day) %>%
                tally(),
-             aes(x=LONGITUDE2, y = LATITUDE2, color = n), 
-             fill = "transparent", alpha = 0.4, size = 1.5)+
+             aes( color = n), 
+             fill = "transparent",  size = 1)+
   scale_colour_viridis(direction = -1,
                        discrete = FALSE, option = "D")+
-  ylim(min(ParkingMeter_census$LATITUDE2), max(ParkingMeter_census$LATITUDE2))+
-  xlim(min(ParkingMeter_census$LONGITUDE2), max(ParkingMeter_census$LONGITUDE2))+
   facet_grid(~ time_of_day)+
-  labs(title="Bike share trips per hr by station,\nSF+Alameda, March-April, 2018")+
+  labs(title="Parking Sessions per hr by block,\nSan Francisco, April-May, 2018")+
   mapTheme()
 
 #panel
@@ -554,27 +557,39 @@ week_predictions %>%
   labs(title = "Predicted/Observed bike share time series", subtitle = "SF + Alameda",  x = "Hour", y= "Station Trips") +
   plotTheme()
 
-## MAE by station NOT WORKING
-week_predictions %>% 
+## MAE by station Need to decide on model!!!
+week_predictions_plot <-week_predictions %>% 
   mutate(interval60 = map(data, pull, interval60),
          StationID = map(data, pull, StationID), 
          LATITUDE2 = map(data, pull, LATITUDE2), 
-         LONGITUDE2 = map(data, pull, LONGITUDE2)) %>%
-  select(interval60, StationID, LONGITUDE2, LATITUDE2, Observed, Prediction, Regression) %>%
+         LONGITUDE2 = map(data, pull, LONGITUDE2),
+         dotw = map(data, pull, dotw) ) %>%
+  select(interval60, StationID, LATITUDE2, 
+         LONGITUDE2, Observed, Prediction, Regression,
+         dotw) %>%
   unnest() %>%
-  filter(Regression == "DTime_Space_FE_timeLags") %>%
-  group_by(StationID, LONGITUDE2, LATITUDE2) %>%
-  summarize(MAE = mean(abs(Observed-Prediction), na.rm = TRUE))%>%
-  ggplot(.)+
+  filter(Regression == "DTime_Space_FE_timeLags")%>%
+  mutate(
+    time_of_day = case_when(hour(interval60) < 7 | hour(interval60) > 18 ~ "Overnight",
+                            hour(interval60) >= 7 & hour(interval60) < 10 ~ "AM Rush",
+                            hour(interval60) >= 10 & hour(interval60) < 15 ~ "Mid-Day",
+                            hour(interval60) >= 15 & hour(interval60) <= 18 ~ "PM Rush")) %>%
+  group_by(StationID, time_of_day, LONGITUDE2, LATITUDE2) %>%
+  summarize(MAE = mean(abs(Observed-Prediction), na.rm = TRUE))
+week_predictions_plot <- week_predictions_plot[!(week_predictions_plot$LATITUDE2 == ""), ]
+week_predictions_plot <- week_predictions_plot[!(week_predictions_plot$LONGITUDE2 == ""), ]
+week_predictions_plot <- st_as_sf(x = week_predictions_plot, coords = c("LONGITUDE2","LATITUDE2"),crs = "+proj=longlat +crs = 'EPSG:6339'")
+week_predictions_plot<- st_transform(week_predictions_plot,"EPSG:6339")
+
+
+ggplot()+
   geom_sf(data = sfTracts %>%
             st_transform(crs='EPSG:6339'), colour = '#efefef')+
-  geom_point(aes(x = LONGITUDE2, y = LATITUDE2, color = MAE), 
+  geom_sf(data=week_predictions_plot,aes( color = MAE), 
              fill = "transparent", alpha = 0.4)+
   scale_colour_viridis(direction = -1,
                        discrete = FALSE, option = "D")+
-  ylim(min(ParkingMeter_census$LATITUDE2), max(ParkingMeter_census$LATITUDE2))+
-  xlim(min(ParkingMeter_census$sLONGITUDE2), max(ParkingMeter_census$LONGITUDE2))+
-  labs(title="Mean Abs Error, Test Set, Model 4")+
+  labs(title="Mean Abs Error, Test Set")+
   mapTheme()
 
 ## Scatterplot
@@ -604,36 +619,40 @@ week_predictions %>%
        y="Predicted trips")+
   plotTheme()
 
-##NOT WORKING
-week_predictions %>% 
+##Error Map
+week_predictions_plot <-week_predictions %>% 
   mutate(interval60 = map(data, pull, interval60),
-         start_station_id = map(data, pull, StationID), 
-         start_station_latitude = map(data, pull, LATITUDE2), 
-         start_station_longitude = map(data, pull, LONGITUDE2),
+         StationID = map(data, pull, StationID), 
+         LATITUDE2 = map(data, pull, LATITUDE2), 
+         LONGITUDE2 = map(data, pull, LONGITUDE2),
          dotw = map(data, pull, dotw) ) %>%
-  select(interval60, start_station_id, start_station_longitude, 
-         start_station_latitude, Observed, Prediction, Regression,
+  select(interval60, StationID, LATITUDE2, 
+         LONGITUDE2, Observed, Prediction, Regression,
          dotw) %>%
   unnest() %>%
   filter(Regression == "DTime_Space_FE_timeLags")%>%
   mutate(
-         time_of_day = case_when(hour(interval60) < 7 | hour(interval60) > 18 ~ "Overnight",
-                                 hour(interval60) >= 7 & hour(interval60) < 10 ~ "AM Rush",
-                                 hour(interval60) >= 10 & hour(interval60) < 15 ~ "Mid-Day",
-                                 hour(interval60) >= 15 & hour(interval60) <= 18 ~ "PM Rush")) %>%
-  group_by(start_station_id, time_of_day, start_station_longitude, start_station_latitude) %>%
-  summarize(MAE = mean(abs(Observed-Prediction), na.rm = TRUE))%>%
-  ggplot(.)+
+    time_of_day = case_when(hour(interval60) < 7 | hour(interval60) > 18 ~ "Overnight",
+                            hour(interval60) >= 7 & hour(interval60) < 10 ~ "AM Rush",
+                            hour(interval60) >= 10 & hour(interval60) < 15 ~ "Mid-Day",
+                            hour(interval60) >= 15 & hour(interval60) <= 18 ~ "PM Rush")) %>%
+  group_by(StationID, time_of_day, LONGITUDE2, LATITUDE2) %>%
+  summarize(MAE = mean(abs(Observed-Prediction), na.rm = TRUE))
+week_predictions_plot <- week_predictions_plot[!(week_predictions_plot$LATITUDE2 == ""), ]
+week_predictions_plot <- week_predictions_plot[!(week_predictions_plot$LONGITUDE2 == ""), ]
+week_predictions_plot <- st_as_sf(x = week_predictions_plot, coords = c("LONGITUDE2","LATITUDE2"),crs = "+proj=longlat +crs = 'EPSG:6339'")
+week_predictions_plot<- st_transform(week_predictions_plot,"EPSG:6339")
+
+
+ggplot()+
   geom_sf(data = sfTracts %>%
             st_transform(crs='EPSG:6339'), colour = '#efefef')+
-  geom_point(aes(x = start_station_longitude, y = start_station_latitude, color = MAE), 
-             fill = "transparent", size = 0.5, alpha = 1.5)+
+  geom_sf(data=week_predictions_plot,aes( color = MAE), 
+          fill = "transparent", size = 0.5, alpha = 1.5)+
   scale_colour_viridis(direction = -1,
                        discrete = FALSE, option = "D")+
-  ylim(min(ParkingMeter_census$LATITUDE2), max(ParkingMeter_census$LATITUDE2))+
-  xlim(min(ParkingMeter_census$LONGITUDE2), max(ParkingMeter_census$LONGITUDE2))+
-  facet_grid(~time_of_day)+
   labs(title="Mean Absolute Errors, Test Set")+
+  facet_grid(~time_of_day)+
   mapTheme()
 
 ## Error and census
@@ -696,17 +715,23 @@ ride.animation.data <-
                            Trip_Count > 15 ~ "15+ trips")) %>%
   mutate(Trips  = fct_relevel(Trips, "0 trips","0-2 trips","2-5 trips",
                               "5-10 trips","10-15 trips","15+ trips"))
+ride.animation.data <- ride.animation.data[!(ride.animation.data$LATITUDE2 == ""), ]
+ride.animation.data <- ride.animation.data[!(ride.animation.data$LONGITUDE2 == ""), ]
+ride.animation.data <- st_as_sf(x = ride.animation.data, coords = c("LONGITUDE2","LATITUDE2"),crs = "+proj=longlat +crs = 'EPSG:6339'")
+ride.animation.data<- st_transform(ride.animation.data,"EPSG:6339")
 
 rideshare_animation <-
   ggplot()+
   geom_sf(data = sfTracts %>%
             st_transform(crs='EPSG:6339'), colour = '#efefef')+
-  geom_point(data = ride.animation.data, 
-             aes(x = LONGITUDE2, y = LATITUDE2, fill = Trips), size = 0.5, alpha = 1.5) +
+  geom_sf(data = ride.animation.data, 
+             aes( fill = Trips), size = 0.5, alpha = 1.5) +
   scale_colour_manual(values = palette5) +
-  labs(title = "Rideshare pickups for one week in March 2018",
+  labs(title = "Parking Sessions by Block for one day in April 2018",
        subtitle = "15 minute intervals: {current_frame}") +
   transition_manual(interval15) +
   mapTheme()
 
 animate(rideshare_animation, duration=20, renderer = gifski_renderer())
+
+
