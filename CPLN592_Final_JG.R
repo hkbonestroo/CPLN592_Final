@@ -3,12 +3,6 @@
 
 #sf_Boundary_geometry
 
-sf_bound <- 
-  read.socrata("https://data.sfgov.org/api/views/wamw-vt4s/rows.json?accessType=DOWNLOAD") %>%
-  filter(county == "San Francisco") %>%
-  st_as_sf(coords = c("the_geom", crs = 4326, agr = "constant")) %>%
-  st_transform('ESRI:102241') 
-
 
 spdf <- geojson_read("https://raw.githubusercontent.com/gregoiredavid/france-geojson/master/communes.geojson",  what = "sp")
 
@@ -22,6 +16,16 @@ foodretail <-
   st_as_sf(coords = c("location.coordinates"), crs = 4326, agr = "constant") %>%
   st_transform('ESRI:102241') %>%
   mutate(Legend = "Food Services")  
+  
+  # Google maps API key AIzaSyAWq_0IELtG0z_e8n10iZKCVRLB-bZKc_A
+
+
+  library(ggmap)
+  library(data.table)
+  
+  
+  register_google(key = "AIzaSyAWq_0IELtG0z_e8n10iZKCVRLB-bZKc_A")
+  
   
   
   
