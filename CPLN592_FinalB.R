@@ -67,7 +67,7 @@ qBr <- function(df, variable, rnd) {
 }
 
 q5 <- function(variable) {as.factor(ntile(variable, 5))}
-
+palette6 <-c("#eff3ff","#bdd7e7","#6baed6","#3182bd","#08519c","#D2FBD4")
 palette5 <- c("#eff3ff","#bdd7e7","#6baed6","#3182bd","#08519c")
 palette4 <- c("#D2FBD4","#92BCAB","#527D82","#123F5A")
 palette2 <- c("#6baed6","#08519c")
@@ -100,14 +100,13 @@ census_api_key("91a259a2aaac3093a636d189040e0ff263fc823b", overwrite = TRUE)
 
 sfCounty <-
   st_read("https://data.sfgov.org/api/geospatial/p5b7-5n3h?method=export&format=GeoJSON") %>% 
-  st_union() %>%
-  st_transform('ESRI:102241')
+  st_union()
+sfCounty <- st_transform(sfCounty, 'EPSG:6339')
 
 neighborhoods <- 
   st_read("https://data.sfgov.org/api/geospatial/pty2-tcw4?method=export&format=GeoJSON") %>%
-  st_transform('ESRI:102241') %>%
   dplyr::select(-link)
-
+neighborhoods <-  st_transform(neighborhoods,'EPSG:6339') 
 
 #load sf tracts
 sfCensus <- 
@@ -196,10 +195,14 @@ ParkingMeters.sf <- ParkingMeters.sf[!(ParkingMeters.sf$LONGITUDE == ""), ]
 ParkingMeters.sf <- st_as_sf(x = ParkingMeters.sf, coords = c("LONGITUDE","LATITUDE"),crs = "+proj=longlat +crs = 'EPSG:6339'")
 ParkingMeters.sf<- st_transform(ParkingMeters.sf,"EPSG:6339")
 
+#neighborhoods
+
+ParkingMeters.sf <- st_join(ParkingMeters.sf,neighborhoods, join = st_within)
+
 ParkingMeters.sf <-
   ParkingMeters.sf%>%
   dplyr::select(StationID,STREET_BLOCK,POST_ID,SESSION_START_DT,SESSION_END_DT,GROSS_PAID_AMT,interval60,interval15,week,dotw,ParkTime,
-                ParkTimeMin2,GROSS_PAID_AMT2,ParkingRate,Neighborhoods,COLLECTION_SUBROUTE,LONGITUDE2,LATITUDE2)
+                ParkTimeMin2,GROSS_PAID_AMT2,ParkingRate,Neighborhoods,COLLECTION_SUBROUTE,LONGITUDE2,LATITUDE2,name)
 
 ## Adding census data to parking data
 ParkingMeter_census <- st_join(ParkingMeters.sf %>% 
@@ -267,6 +270,7 @@ ParkingMeter_census %>%
   facet_wrap(~time_of_day)+
   plotTheme()
 
+
 ## By block
 ggplot(ParkingMeter_census %>%
          group_by(interval60, StationID) %>%
@@ -318,7 +322,7 @@ study.panel <-
               StationID = unique(ParkingMeters$StationID))
 study.panel <-
 left_join(study.panel, ParkingMeter_census %>%
-            dplyr::select(StationID,  Origin.Tract, LONGITUDE2, LATITUDE2 )%>%
+            dplyr::select(StationID,  Origin.Tract, name, LONGITUDE2, LATITUDE2 )%>%
             distinct() %>%
             group_by(StationID) %>%
             slice(1))
@@ -335,7 +339,7 @@ ride.panel <-
 
 ride.panel <-
   ride.panel%>%
-  group_by(interval60, StationID, Origin.Tract, LONGITUDE2, LATITUDE2) %>%
+  group_by(interval60, StationID, Origin.Tract,name, LONGITUDE2, LATITUDE2) %>%
   summarize(Trip_Count = sum(Trip_Counter, na.rm=T)) %>%
   left_join(weather.Panel) %>%
   ungroup() %>%
@@ -452,6 +456,15 @@ ride.panel <-
   ride.panel %>% 
   mutate(
     station_dist = nn_function(st_coordinates(ride.panel), st_coordinates(transit_stops), 1))
+#time of day
+ride.panel<-
+  ride.panel%>%
+  mutate(
+       time_of_day = case_when(hour(interval60) < 7 | hour(interval60) > 18 ~ "Overnight",
+                               hour(interval60) >= 7 & hour(interval60) < 10 ~ "AM Rush",
+                               hour(interval60) >= 10 & hour(interval60) < 15 ~ "Mid-Day",
+                               hour(interval60) >= 15 & hour(interval60) <= 18 ~ "PM Rush"))
+
 
 # training test
 ## Regression
@@ -472,6 +485,9 @@ reg4 <- lm(Trip_Count ~  StationID +  hour(interval60) +
 reg5 <- lm(Trip_Count ~  StationID +  hour(interval60) +
              lagHour + lag2Hours + lag3Hours + lag12Hours + lag1day +bar_dist +station_dist, 
            data=ride.Train)
+reg6 <-lm(Trip_Count ~  StationID +  hour(interval60) +
+            lagHour + lag2Hours + lag3Hours + lag12Hours + lag1day +bar_dist +station_dist+name+time_of_day, 
+          data=ride.Train)
 ## Predicting 
 ride.Test.weekNest <- 
   ride.Test %>%
@@ -486,7 +502,8 @@ week_predictions <-
          BSpace_FE = map(.x = data, fit = reg2, .f = model_pred),
          CTime_Space_FE = map(.x = data, fit = reg3, .f = model_pred),
          DTime_Space_FE_timeLags = map(.x = data, fit = reg4, .f = model_pred),
-         ETime_Space_FE_timeLags_Features = map(.x = data, fit = reg5, .f = model_pred)) %>% 
+         ETime_Space_FE_timeLags_Features = map(.x = data, fit = reg5, .f = model_pred),
+         All_features=map(.x = data, fit = reg6, .f = model_pred)) %>% 
   gather(Regression, Prediction, -data, -week) %>%
   mutate(Observed = map(data, pull, Trip_Count),
          Absolute_Error = map2(Observed, Prediction,  ~ abs(.x - .y)),
@@ -510,7 +527,7 @@ set.seed(1000)
 
 reg.cv <-  
   train(Trip_Count ~ StationID +  hour(interval60) +
-          lagHour + lag2Hours + lag3Hours + lag12Hours + lag1day +bar_dist +station_dist, 
+          lagHour + lag2Hours + lag3Hours + lag12Hours + lag1day +bar_dist +station_dist+name+time_of_day, 
         data = netsample,  
         method = "lm",  
         trControl = fitControl,  
@@ -525,7 +542,8 @@ week_predictions <-
          BSpace_FE = map(.x = data, fit = reg2, .f = model_pred),
          CTime_Space_FE = map(.x = data, fit = reg3, .f = model_pred),
          DTime_Space_FE_timeLags = map(.x = data, fit = reg4, .f = model_pred),
-         ETime_Space_FE_timeLags_Features = map(.x = data, fit = reg5, .f = model_pred)) %>% 
+         ETime_Space_FE_timeLags_Features = map(.x = data, fit = reg5, .f = model_pred),
+         All_features=map(.x = data, fit = reg6, .f = model_pred)) %>% 
   gather(Regression, Prediction, -data, -week) %>%
   mutate(Observed = map(data, pull, Trip_Count),
          Absolute_Error = map2(Observed, Prediction,  ~ abs(.x - .y)),
@@ -538,7 +556,7 @@ week_predictions %>%
   gather(Variable, MAE, -Regression, -week) %>%
   ggplot(aes(week, MAE)) + 
   geom_bar(aes(fill = Regression), position = "dodge", stat="identity") +
-  scale_fill_manual(values = palette5) +
+  scale_fill_manual(values = palette6) +
   labs(title = "Mean Absolute Errors by model specification") +
   plotTheme()
 
@@ -568,7 +586,7 @@ week_predictions_plot <-week_predictions %>%
          LONGITUDE2, Observed, Prediction, Regression,
          dotw) %>%
   unnest() %>%
-  filter(Regression == "DTime_Space_FE_timeLags")%>%
+  filter(Regression == "All_features")%>%
   mutate(
     time_of_day = case_when(hour(interval60) < 7 | hour(interval60) > 18 ~ "Overnight",
                             hour(interval60) >= 7 & hour(interval60) < 10 ~ "AM Rush",
@@ -603,7 +621,7 @@ week_predictions %>%
          start_station_latitude, Observed, Prediction, Regression,
          dotw) %>%
   unnest() %>%
-  filter(Regression == "DTime_Space_FE_timeLags")%>%
+  filter(Regression == "All_features")%>%
   mutate(weekend = ifelse(dotw %in% c("Sun", "Sat"), "Weekend", "Weekday"),
          time_of_day = case_when(hour(interval60) < 7 | hour(interval60) > 18 ~ "Overnight",
                                  hour(interval60) >= 7 & hour(interval60) < 10 ~ "AM Rush",
@@ -630,7 +648,7 @@ week_predictions_plot <-week_predictions %>%
          LONGITUDE2, Observed, Prediction, Regression,
          dotw) %>%
   unnest() %>%
-  filter(Regression == "DTime_Space_FE_timeLags")%>%
+  filter(Regression == "All_features")%>%
   mutate(
     time_of_day = case_when(hour(interval60) < 7 | hour(interval60) > 18 ~ "Overnight",
                             hour(interval60) >= 7 & hour(interval60) < 10 ~ "AM Rush",
@@ -734,4 +752,394 @@ rideshare_animation <-
 
 animate(rideshare_animation, duration=20, renderer = gifski_renderer())
 
+#test set
+ride.test2 <-
+  ride.Test %>%
+  mutate(Sessions.Predict = predict(reg.cv, ride.Test))
 
+ride.test3 <-
+  ride.test2%>%
+  dplyr::select(LONGITUDE2,LATITUDE2,Sessions.Predict,dotw,interval60)
+
+ride.test3$hour <- hour(ride.test3$interval60)
+ride.test3.1 <- ride.test3%>%filter(hour==13)
+ride.test3.1 <-subset(ride.test3.1, dotw %in% "Thu")
+
+#heat map for 1pm thursday
+library(ggplot2)
+library(ggmap)
+library(data.table)
+library(devtools)
+register_google("AIzaSyBdJ9ul_TnsyOrrlL00KM8uPv3KuAXEVVE", write = FALSE)
+# import data and libaries 
+
+map <- get_map(location = "san francisco", zoom = 15)
+ride.test3.1<-setDT(ride.test3.1)
+
+
+# generate bins for the x, y coordinates
+xbreaks <- seq(floor(min(as.numeric(ride.test3.1$LATITUDE2))), ceiling(max(as.numeric(ride.test3.1$LATITUDE2))), by = 0.001)
+ybreaks <- seq(floor(min(as.numeric(ride.test3.1$LONGITUDE2))), ceiling(max(as.numeric(ride.test3.1$LONGITUDE2))), by = 0.001)
+
+# allocate the data points into the bins
+ride.test3.1$latbin <- xbreaks[cut(as.numeric(ride.test3.1$LATITUDE2), breaks = xbreaks, labels=F)]
+ride.test3.1$longbin <- ybreaks[cut(as.numeric(ride.test3.1$LONGITUDE2), breaks = ybreaks, labels=F)]
+
+# Summarise the data for each bin
+datamat <- ride.test3.1[, list(Sessions.Predict = mean(Sessions.Predict)), 
+                by = c("latbin", "longbin")]
+
+# Merge the summarised data with all possible x, y coordinate combinations to get 
+# a value for every bin
+datamat <- merge(setDT(expand.grid(latbin = xbreaks, longbin = ybreaks)), datamat, 
+                 by = c("latbin", "longbin"), all.x = TRUE, all.y = FALSE)
+
+# Fill up the empty bins 0 to smooth the contour plot
+datamat[is.na(Sessions.Predict), ]$Sessions.Predict <- 0
+
+
+# Plot the contours
+ggmap(map, extent = "device") +
+  stat_contour(data = datamat, aes(x = longbin, y = latbin, z = Sessions.Predict, 
+                                   fill = ..level.., alpha = ..level..), geom = 'polygon', binwidth =1) +
+  scale_fill_gradient(name = "Sessions", low = "green", high = "red") +
+  guides(alpha = FALSE)
+
+
+
+
+#heat map for 2pm thursday
+ride.test3.2 <- ride.test3%>%filter(hour==14)
+ride.test3.2 <-subset(ride.test3.2, dotw %in% "Thu")
+library(ggplot2)
+library(ggmap)
+library(data.table)
+library(devtools)
+register_google("AIzaSyBdJ9ul_TnsyOrrlL00KM8uPv3KuAXEVVE", write = FALSE)
+# import data and libaries 
+
+map <- get_map(location = "san francisco", zoom = 15)
+ride.test3.2<-setDT(ride.test3.2)
+
+
+# generate bins for the x, y coordinates
+xbreaks <- seq(floor(min(as.numeric(ride.test3.2$LATITUDE2))), ceiling(max(as.numeric(ride.test3.2$LATITUDE2))), by = 0.001)
+ybreaks <- seq(floor(min(as.numeric(ride.test3.2$LONGITUDE2))), ceiling(max(as.numeric(ride.test3.2$LONGITUDE2))), by = 0.001)
+
+# allocate the data points into the bins
+ride.test3.2$latbin <- xbreaks[cut(as.numeric(ride.test3.2$LATITUDE2), breaks = xbreaks, labels=F)]
+ride.test3.2$longbin <- ybreaks[cut(as.numeric(ride.test3.2$LONGITUDE2), breaks = ybreaks, labels=F)]
+
+# Summarise the data for each bin
+datamat <- ride.test3.2[, list(Sessions.Predict = mean(Sessions.Predict)), 
+                        by = c("latbin", "longbin")]
+
+# Merge the summarised data with all possible x, y coordinate combinations to get 
+# a value for every bin
+datamat <- merge(setDT(expand.grid(latbin = xbreaks, longbin = ybreaks)), datamat, 
+                 by = c("latbin", "longbin"), all.x = TRUE, all.y = FALSE)
+
+# Fill up the empty bins 0 to smooth the contour plot
+datamat[is.na(Sessions.Predict), ]$Sessions.Predict <- 0
+
+
+# Plot the contours
+ggmap(map, extent = "device") +
+  stat_contour(data = datamat, aes(x = longbin, y = latbin, z = Sessions.Predict, 
+                                   fill = ..level.., alpha = ..level..), geom = 'polygon', binwidth =1) +
+  scale_fill_gradient(name = "Sessions", low = "green", high = "red") +
+  guides(alpha = FALSE)
+
+#heat map for 3pm thursday
+ride.test3.3 <- ride.test3%>%filter(hour==15)
+ride.test3.3 <-subset(ride.test3.3, dotw %in% "Thu")
+library(ggplot2)
+library(ggmap)
+library(data.table)
+library(devtools)
+register_google("AIzaSyBdJ9ul_TnsyOrrlL00KM8uPv3KuAXEVVE", write = FALSE)
+# import data and libaries 
+
+map <- get_map(location = "san francisco", zoom = 15)
+ride.test3.3<-setDT(ride.test3.3)
+
+
+# generate bins for the x, y coordinates
+xbreaks <- seq(floor(min(as.numeric(ride.test3.3$LATITUDE2))), ceiling(max(as.numeric(ride.test3.3$LATITUDE2))), by = 0.001)
+ybreaks <- seq(floor(min(as.numeric(ride.test3.3$LONGITUDE2))), ceiling(max(as.numeric(ride.test3.3$LONGITUDE2))), by = 0.001)
+
+# allocate the data points into the bins
+ride.test3.3$latbin <- xbreaks[cut(as.numeric(ride.test3.3$LATITUDE2), breaks = xbreaks, labels=F)]
+ride.test3.3$longbin <- ybreaks[cut(as.numeric(ride.test3.3$LONGITUDE2), breaks = ybreaks, labels=F)]
+
+# Summarise the data for each bin
+datamat <- ride.test3.3[, list(Sessions.Predict = mean(Sessions.Predict)), 
+                        by = c("latbin", "longbin")]
+
+# Merge the summarised data with all possible x, y coordinate combinations to get 
+# a value for every bin
+datamat <- merge(setDT(expand.grid(latbin = xbreaks, longbin = ybreaks)), datamat, 
+                 by = c("latbin", "longbin"), all.x = TRUE, all.y = FALSE)
+
+# Fill up the empty bins 0 to smooth the contour plot
+datamat[is.na(Sessions.Predict), ]$Sessions.Predict <- 0
+
+
+# Plot the contours
+ggmap(map, extent = "device") +
+  stat_contour(data = datamat, aes(x = longbin, y = latbin, z = Sessions.Predict, 
+                                   fill = ..level.., alpha = ..level..), geom = 'polygon', binwidth =1) +
+  scale_fill_gradient(name = "Sessions", low = "green", high = "red") +
+  guides(alpha = FALSE)
+
+#heat map for 4pm thursday
+ride.test3.4 <- ride.test3%>%filter(hour(interval60)==16)
+ride.test3.4 <-subset(ride.test3.4, dotw %in% "Thu")
+library(ggplot2)
+library(ggmap)
+library(data.table)
+library(devtools)
+register_google("AIzaSyBdJ9ul_TnsyOrrlL00KM8uPv3KuAXEVVE", write = FALSE)
+# import data and libaries 
+
+map <- get_map(location = "san francisco", zoom = 15)
+ride.test3.4<-setDT(ride.test3.4)
+
+
+# generate bins for the x, y coordinates
+xbreaks <- seq(floor(min(as.numeric(ride.test3.4$LATITUDE2))), ceiling(max(as.numeric(ride.test3.4$LATITUDE2))), by = 0.001)
+ybreaks <- seq(floor(min(as.numeric(ride.test3.4$LONGITUDE2))), ceiling(max(as.numeric(ride.test3.4$LONGITUDE2))), by = 0.001)
+
+# allocate the data points into the bins
+ride.test3.4$latbin <- xbreaks[cut(as.numeric(ride.test3.4$LATITUDE2), breaks = xbreaks, labels=F)]
+ride.test3.4$longbin <- ybreaks[cut(as.numeric(ride.test3.4$LONGITUDE2), breaks = ybreaks, labels=F)]
+
+# Summarise the data for each bin
+datamat <- ride.test3.4[, list(Sessions.Predict = mean(Sessions.Predict)), 
+                        by = c("latbin", "longbin")]
+
+# Merge the summarised data with all possible x, y coordinate combinations to get 
+# a value for every bin
+datamat <- merge(setDT(expand.grid(latbin = xbreaks, longbin = ybreaks)), datamat, 
+                 by = c("latbin", "longbin"), all.x = TRUE, all.y = FALSE)
+
+# Fill up the empty bins 0 to smooth the contour plot
+datamat[is.na(Sessions.Predict), ]$Sessions.Predict <- 0
+
+
+# Plot the contours
+ggmap(map, extent = "device") +
+  stat_contour(data = datamat, aes(x = longbin, y = latbin, z = Sessions.Predict, 
+                                   fill = ..level.., alpha = ..level..), geom = 'polygon', binwidth =1) +
+  scale_fill_gradient(name = "Sessions", low = "green", high = "red") +
+  guides(alpha = FALSE)
+
+#heat map for 5pm thursday
+ride.test3.5 <- ride.test3%>%filter(hour(interval60)==17)
+ride.test3.5 <-subset(ride.test3.5, dotw %in% "Thu")
+library(ggplot2)
+library(ggmap)
+library(data.table)
+library(devtools)
+register_google("AIzaSyBdJ9ul_TnsyOrrlL00KM8uPv3KuAXEVVE", write = FALSE)
+# import data and libaries 
+
+map <- get_map(location = "san francisco", zoom = 15)
+ride.test3.5<-setDT(ride.test3.5)
+
+
+# generate bins for the x, y coordinates
+xbreaks <- seq(floor(min(as.numeric(ride.test3.5$LATITUDE2))), ceiling(max(as.numeric(ride.test3.5$LATITUDE2))), by = 0.001)
+ybreaks <- seq(floor(min(as.numeric(ride.test3.5$LONGITUDE2))), ceiling(max(as.numeric(ride.test3.5$LONGITUDE2))), by = 0.001)
+
+# allocate the data points into the bins
+ride.test3.5$latbin <- xbreaks[cut(as.numeric(ride.test3.5$LATITUDE2), breaks = xbreaks, labels=F)]
+ride.test3.5$longbin <- ybreaks[cut(as.numeric(ride.test3.5$LONGITUDE2), breaks = ybreaks, labels=F)]
+
+# Summarise the data for each bin
+datamat <- ride.test3.5[, list(Sessions.Predict = mean(Sessions.Predict)), 
+                        by = c("latbin", "longbin")]
+
+# Merge the summarised data with all possible x, y coordinate combinations to get 
+# a value for every bin
+datamat <- merge(setDT(expand.grid(latbin = xbreaks, longbin = ybreaks)), datamat, 
+                 by = c("latbin", "longbin"), all.x = TRUE, all.y = FALSE)
+
+# Fill up the empty bins 0 to smooth the contour plot
+datamat[is.na(Sessions.Predict), ]$Sessions.Predict <- 0
+
+
+# Plot the contours
+ggmap(map, extent = "device") +
+  stat_contour(data = datamat, aes(x = longbin, y = latbin, z = Sessions.Predict, 
+                                   fill = ..level.., alpha = ..level..), geom = 'polygon', binwidth =1) +
+  scale_fill_gradient(name = "Sessions", low = "green", high = "red") +
+  guides(alpha = FALSE)
+
+#heat map for 6pm thursday
+ride.test3.6 <- ride.test3%>%filter(hour==18)
+ride.test3.6 <-subset(ride.test3.6, dotw %in% "Thu")
+library(ggplot2)
+library(ggmap)
+library(data.table)
+library(devtools)
+register_google("AIzaSyBdJ9ul_TnsyOrrlL00KM8uPv3KuAXEVVE", write = FALSE)
+# import data and libaries 
+
+map <- get_map(location = "san francisco", zoom = 15)
+ride.test3.6<-setDT(ride.test3.6)
+
+
+# generate bins for the x, y coordinates
+xbreaks <- seq(floor(min(as.numeric(ride.test3.6$LATITUDE2))), ceiling(max(as.numeric(ride.test3.6$LATITUDE2))), by = 0.001)
+ybreaks <- seq(floor(min(as.numeric(ride.test3.6$LONGITUDE2))), ceiling(max(as.numeric(ride.test3.6$LONGITUDE2))), by = 0.001)
+
+# allocate the data points into the bins
+ride.test3.6$latbin <- xbreaks[cut(as.numeric(ride.test3.6$LATITUDE2), breaks = xbreaks, labels=F)]
+ride.test3.6$longbin <- ybreaks[cut(as.numeric(ride.test3.6$LONGITUDE2), breaks = ybreaks, labels=F)]
+
+# Summarise the data for each bin
+datamat <- ride.test3.6[, list(Sessions.Predict = mean(Sessions.Predict)), 
+                        by = c("latbin", "longbin")]
+
+# Merge the summarised data with all possible x, y coordinate combinations to get 
+# a value for every bin
+datamat <- merge(setDT(expand.grid(latbin = xbreaks, longbin = ybreaks)), datamat, 
+                 by = c("latbin", "longbin"), all.x = TRUE, all.y = FALSE)
+
+# Fill up the empty bins 0 to smooth the contour plot
+datamat[is.na(Sessions.Predict), ]$Sessions.Predict <- 0
+
+
+# Plot the contours
+ggmap(map, extent = "device") +
+  stat_contour(data = datamat, aes(x = longbin, y = latbin, z = Sessions.Predict, 
+                                   fill = ..level.., alpha = ..level..), geom = 'polygon', binwidth =1) +
+  scale_fill_gradient(name = "Sessions", low = "green", high = "red") +
+  guides(alpha = FALSE)
+
+#heat map for7pm thursday
+ride.test3.7 <- ride.test3%>%filter(hour==19)
+ride.test3.7 <-subset(ride.test3.7, dotw %in% "Thu")
+library(ggplot2)
+library(ggmap)
+library(data.table)
+library(devtools)
+register_google("AIzaSyBdJ9ul_TnsyOrrlL00KM8uPv3KuAXEVVE", write = FALSE)
+# import data and libaries 
+
+map <- get_map(location = "san francisco", zoom = 15)
+ride.test3.7<-setDT(ride.test3.7)
+
+
+# generate bins for the x, y coordinates
+xbreaks <- seq(floor(min(as.numeric(ride.test3.7$LATITUDE2))), ceiling(max(as.numeric(ride.test3.7$LATITUDE2))), by = 0.001)
+ybreaks <- seq(floor(min(as.numeric(ride.test3.7$LONGITUDE2))), ceiling(max(as.numeric(ride.test3.7$LONGITUDE2))), by = 0.001)
+
+# allocate the data points into the bins
+ride.test3.7$latbin <- xbreaks[cut(as.numeric(ride.test3.7$LATITUDE2), breaks = xbreaks, labels=F)]
+ride.test3.7$longbin <- ybreaks[cut(as.numeric(ride.test3.7$LONGITUDE2), breaks = ybreaks, labels=F)]
+
+# Summarise the data for each bin
+datamat <- ride.test3.7[, list(Sessions.Predict = mean(Sessions.Predict)), 
+                        by = c("latbin", "longbin")]
+
+# Merge the summarised data with all possible x, y coordinate combinations to get 
+# a value for every bin
+datamat <- merge(setDT(expand.grid(latbin = xbreaks, longbin = ybreaks)), datamat, 
+                 by = c("latbin", "longbin"), all.x = TRUE, all.y = FALSE)
+
+# Fill up the empty bins 0 to smooth the contour plot
+datamat[is.na(Sessions.Predict), ]$Sessions.Predict <- 0
+
+
+# Plot the contours
+ggmap(map, extent = "device") +
+  stat_contour(data = datamat, aes(x = longbin, y = latbin, z = Sessions.Predict, 
+                                   fill = ..level.., alpha = ..level..), geom = 'polygon', binwidth =1) +
+  scale_fill_gradient(name = "Sessions", low = "green", high = "red") +
+  guides(alpha = FALSE)
+
+#heat map for 8pm thursday
+ride.test3.8 <- ride.test3%>%filter(hour==20)
+ride.test3.8 <-subset(ride.test3.8, dotw %in% "Thu")
+library(ggplot2)
+library(ggmap)
+library(data.table)
+library(devtools)
+register_google("AIzaSyBdJ9ul_TnsyOrrlL00KM8uPv3KuAXEVVE", write = FALSE)
+# import data and libaries 
+
+map <- get_map(location = "san francisco", zoom = 15)
+ride.test3.8<-setDT(ride.test3.8)
+
+
+# generate bins for the x, y coordinates
+xbreaks <- seq(floor(min(as.numeric(ride.test3.8$LATITUDE2))), ceiling(max(as.numeric(ride.test3.8$LATITUDE2))), by = 0.001)
+ybreaks <- seq(floor(min(as.numeric(ride.test3.8$LONGITUDE2))), ceiling(max(as.numeric(ride.test3.8$LONGITUDE2))), by = 0.001)
+
+# allocate the data points into the bins
+ride.test3.8$latbin <- xbreaks[cut(as.numeric(ride.test3.8$LATITUDE2), breaks = xbreaks, labels=F)]
+ride.test3.8$longbin <- ybreaks[cut(as.numeric(ride.test3.8$LONGITUDE2), breaks = ybreaks, labels=F)]
+
+# Summarise the data for each bin
+datamat <- ride.test3.8[, list(Sessions.Predict = mean(Sessions.Predict)), 
+                        by = c("latbin", "longbin")]
+
+# Merge the summarised data with all possible x, y coordinate combinations to get 
+# a value for every bin
+datamat <- merge(setDT(expand.grid(latbin = xbreaks, longbin = ybreaks)), datamat, 
+                 by = c("latbin", "longbin"), all.x = TRUE, all.y = FALSE)
+
+# Fill up the empty bins 0 to smooth the contour plot
+datamat[is.na(Sessions.Predict), ]$Sessions.Predict <- 0
+
+
+# Plot the contours
+ggmap(map, extent = "device") +
+  stat_contour(data = datamat, aes(x = longbin, y = latbin, z = Sessions.Predict, 
+                                   fill = ..level.., alpha = ..level..), geom = 'polygon', binwidth =1) +
+  scale_fill_gradient(name = "Sessions", low = "green", high = "red") +
+  guides(alpha = FALSE)
+
+#heat map for 9pm thursday
+ride.test3.9 <- ride.test3%>%filter(hour==21)
+ride.test3.9 <-subset(ride.test3.9, dotw %in% "Thu")
+library(ggplot2)
+library(ggmap)
+library(data.table)
+library(devtools)
+register_google("AIzaSyBdJ9ul_TnsyOrrlL00KM8uPv3KuAXEVVE", write = FALSE)
+# import data and libaries 
+
+map <- get_map(location = "san francisco", zoom = 15)
+ride.test3.9<-setDT(ride.test3.9)
+
+
+# generate bins for the x, y coordinates
+xbreaks <- seq(floor(min(as.numeric(ride.test3.9$LATITUDE2))), ceiling(max(as.numeric(ride.test3.9$LATITUDE2))), by = 0.001)
+ybreaks <- seq(floor(min(as.numeric(ride.test3.9$LONGITUDE2))), ceiling(max(as.numeric(ride.test3.9$LONGITUDE2))), by = 0.001)
+
+# allocate the data points into the bins
+ride.test3.9$latbin <- xbreaks[cut(as.numeric(ride.test3.9$LATITUDE2), breaks = xbreaks, labels=F)]
+ride.test3.9$longbin <- ybreaks[cut(as.numeric(ride.test3.9$LONGITUDE2), breaks = ybreaks, labels=F)]
+
+# Summarise the data for each bin
+datamat <- ride.test3.9[, list(Sessions.Predict = mean(Sessions.Predict)), 
+                        by = c("latbin", "longbin")]
+
+# Merge the summarised data with all possible x, y coordinate combinations to get 
+# a value for every bin
+datamat <- merge(setDT(expand.grid(latbin = xbreaks, longbin = ybreaks)), datamat, 
+                 by = c("latbin", "longbin"), all.x = TRUE, all.y = FALSE)
+
+# Fill up the empty bins 0 to smooth the contour plot
+datamat[is.na(Sessions.Predict), ]$Sessions.Predict <- 0
+
+
+# Plot the contours
+ggmap(map, extent = "device") +
+  stat_contour(data = datamat, aes(x = longbin, y = latbin, z = Sessions.Predict, 
+                                   fill = ..level.., alpha = ..level..), geom = 'polygon', binwidth =1) +
+  scale_fill_gradient(name = "Sessions", low = "green", high = "red") +
+  guides(alpha = FALSE)
