@@ -770,7 +770,7 @@ library(ggplot2)
 library(ggmap)
 library(data.table)
 library(devtools)
-register_google("AIzaSyBdJ9ul_TnsyOrrlL00KM8uPv3KuAXEVVE", write = FALSE)
+register_google("", write = FALSE)
 # import data and libaries 
 
 map <- get_map(location = "san francisco", zoom = 15)
@@ -815,7 +815,7 @@ library(ggplot2)
 library(ggmap)
 library(data.table)
 library(devtools)
-register_google("AIzaSyBdJ9ul_TnsyOrrlL00KM8uPv3KuAXEVVE", write = FALSE)
+register_google("", write = FALSE)
 # import data and libaries 
 
 map <- get_map(location = "san francisco", zoom = 15)
@@ -857,7 +857,7 @@ library(ggplot2)
 library(ggmap)
 library(data.table)
 library(devtools)
-register_google("AIzaSyBdJ9ul_TnsyOrrlL00KM8uPv3KuAXEVVE", write = FALSE)
+register_google("", write = FALSE)
 # import data and libaries 
 
 map <- get_map(location = "san francisco", zoom = 15)
@@ -899,7 +899,7 @@ library(ggplot2)
 library(ggmap)
 library(data.table)
 library(devtools)
-register_google("AIzaSyBdJ9ul_TnsyOrrlL00KM8uPv3KuAXEVVE", write = FALSE)
+register_google("", write = FALSE)
 # import data and libaries 
 
 map <- get_map(location = "san francisco", zoom = 15)
@@ -941,7 +941,7 @@ library(ggplot2)
 library(ggmap)
 library(data.table)
 library(devtools)
-register_google("AIzaSyBdJ9ul_TnsyOrrlL00KM8uPv3KuAXEVVE", write = FALSE)
+register_google("", write = FALSE)
 # import data and libaries 
 
 map <- get_map(location = "san francisco", zoom = 15)
@@ -983,7 +983,7 @@ library(ggplot2)
 library(ggmap)
 library(data.table)
 library(devtools)
-register_google("AIzaSyBdJ9ul_TnsyOrrlL00KM8uPv3KuAXEVVE", write = FALSE)
+register_google("", write = FALSE)
 # import data and libaries 
 
 map <- get_map(location = "san francisco", zoom = 15)
@@ -1025,7 +1025,7 @@ library(ggplot2)
 library(ggmap)
 library(data.table)
 library(devtools)
-register_google("AIzaSyBdJ9ul_TnsyOrrlL00KM8uPv3KuAXEVVE", write = FALSE)
+register_google("", write = FALSE)
 # import data and libaries 
 
 map <- get_map(location = "san francisco", zoom = 15)
@@ -1067,7 +1067,7 @@ library(ggplot2)
 library(ggmap)
 library(data.table)
 library(devtools)
-register_google("AIzaSyBdJ9ul_TnsyOrrlL00KM8uPv3KuAXEVVE", write = FALSE)
+register_google("", write = FALSE)
 # import data and libaries 
 
 map <- get_map(location = "san francisco", zoom = 15)
@@ -1109,7 +1109,7 @@ library(ggplot2)
 library(ggmap)
 library(data.table)
 library(devtools)
-register_google("AIzaSyBdJ9ul_TnsyOrrlL00KM8uPv3KuAXEVVE", write = FALSE)
+register_google("", write = FALSE)
 # import data and libaries 
 
 map <- get_map(location = "san francisco", zoom = 15)
