@@ -22,6 +22,14 @@ table, td, th {
 
 </style>
 
+# Introduction
+
+
+# Setup
+
+Begin by loading required libraries and functions. 
+
+
 ```{r setup, results='hide', error=FALSE, message=FALSE, warning=FALSE}
 #setting working directory
 
@@ -48,10 +56,10 @@ library(osmdata)
 
 mapTheme <- function(base_size = 12) {
   theme(
-    text = element_text( color = "black"),
-    plot.title = element_text(size = 24,colour = "black"),
-    plot.subtitle=element_text(face="italic"),
-    plot.caption=element_text(hjust=0),
+    text = element_text(family = "Helvetica", color = "black"),
+    plot.title = element_text(family = "Helvetica", size = 16,colour = "black"),
+    plot.subtitle=element_text(family = "Helvetica", face="italic", size = 12),
+    plot.caption=element_text(hjust=0, size = 10),
     axis.ticks = element_blank(),
     panel.background = element_blank(),axis.title = element_blank(),
     axis.text = element_blank(),
@@ -64,24 +72,24 @@ mapTheme <- function(base_size = 12) {
 
 plotTheme <- function(base_size = 12) {
   theme(
-    text = element_text( color = "black"),
-    plot.title = element_text(size = 24,colour = "black"),
-    plot.subtitle = element_text(face="italic"),
-    plot.caption = element_text(hjust=0),
+    text = element_text(family = "Helvetica", color = "black"),
+    plot.title = element_text(family = "Helvetica", size = 16 ,colour = "black"),
+    plot.subtitle = element_text(family = "Helvetica", face="italic"),
+    plot.caption = element_text(family = "Helvetica", hjust=0),
     axis.ticks = element_blank(),
     panel.background = element_blank(),
     panel.grid.major = element_line("grey60", size = 0.1),
     panel.grid.minor = element_blank(),
     panel.border = element_rect(colour = "black", fill=NA, size=2),
     strip.background = element_rect(fill = "grey60", color = "white"),
-    strip.text = element_text(size=12),
-    axis.title = element_text(size=12),
-    axis.text = element_text(size=10),
+    strip.text = element_text(family = "Helvetica", size=10),
+    axis.title = element_text(family = "Helvetica", size=10),
+    axis.text = element_text(size=8),
     plot.background = element_blank(),
     legend.background = element_blank(),
-    legend.title = element_text(colour = "black", face = "italic"),
-    legend.text = element_text(colour = "black", face = "italic"),
-    strip.text.x = element_text(size = 14)
+    legend.title = element_text(family = "Helvetica", colour = "black", face = "italic"),
+    legend.text = element_text(family = "Helvetica", colour = "black", face = "italic"),
+    strip.text.x = element_text(family = "Helvetica", size = 12)
   )
 }
 
@@ -127,6 +135,8 @@ nn_function <- function(measureFrom,measureTo,k) {
   return(output)  
 }
 ```
+
+Load data for San Francisco geometry including county lines and neighborhood outlines. Load San Francisco census data including median income, median age, percentage of white population,  travel time to work, number of commuters, means of public trasit, and total public transit usage. Load San Francisco census tract geometry. 
 
 ```{r Loading Variables, results='hide', error=FALSE, message=FALSE, warning=FALSE}
 #load san francisco county shapefile
@@ -177,6 +187,12 @@ sfTracts <-
   distinct(GEOID, .keep_all = TRUE) %>%
   dplyr::select(GEOID, geometry) %>% 
   st_sf
+
+```
+
+Load San Francisco parking meter usage data for one week - from April 30th to May 4th of 2018. Select only relevant subset of data, filter for on street metered parking only, and ceate time intervals for sesssion end time. Time intervals are created using lubridate package.
+
+```{r Loading Variables, results='hide', error=FALSE, message=FALSE, warning=FALSE}
 
 # exlude off shore census tracts
 
@@ -280,6 +296,8 @@ ParkingMeter_census <- st_join(ParkingMeters.sf %>%
 
 ```
 
+Add Weather data. A week with little weather change was selected to maximize consistency in parking trends between train days and test days. The following function downloads weather data from San Francisco Airport (SFO) between April 30th and May 4th 2018. 
+
 ```{r Weather, results='hide', error=FALSE, message=FALSE, warning=FALSE}
 #weather
 weather.Panel <- 
@@ -296,14 +314,18 @@ weather.Panel <-
   mutate(Temperature = ifelse(Temperature == 0, 42, Temperature))
 
 grid.arrange(
-  ggplot(weather.Panel, aes(interval60,Precipitation)) + geom_line() + 
+  ggplot(weather.Panel, aes(interval60,Precipitation)) + geom_line(color = "#91ccc3", size = 1) + 
     labs(title="Percipitation", x="Hour", y="Perecipitation") + plotTheme(),
-  ggplot(weather.Panel, aes(interval60,Wind_Speed)) + geom_line() + 
+  ggplot(weather.Panel, aes(interval60,Wind_Speed)) + geom_line(color = "#91ccc3", size = 1) + 
     labs(title="Wind Speed", x="Hour", y="Wind Speed") + plotTheme(),
-  ggplot(weather.Panel, aes(interval60,Temperature)) + geom_line() + 
+  ggplot(weather.Panel, aes(interval60,Temperature)) + geom_line(color = "#91ccc3", size = 1) + 
     labs(title="Temperature", x="Hour", y="Temperature") + plotTheme(),
   top="Weather Data - San Francisco SFO - April-May, 2018")
 ```
+
+# Data Exploration
+
+The following plot illustrates the number of parking sessions per hour during the week. The consistency in sessions per day allows the model to predict parking sessions on Thursday and Friday based on the training data from Monday - Wednesday.
 
 ```{r Data Exploration, results='hide', error=FALSE, message=FALSE, warning=FALSE}
 #plot parking sessions per hour
@@ -311,12 +333,15 @@ grid.arrange(
 ggplot(ParkingMeter_census %>%
          group_by(interval60) %>%
          tally())+
-  geom_line(aes(x = interval60, y = n))+
+  geom_line(aes(x = interval60, y = n), color = "#91ccc3", size = 1.25)+
   labs(title="Parking Sessions per hr,\n San Francisco, May, 2018",
        x="Date", 
        y="Number of Sessions")+
   plotTheme()
+```
 
+
+```{r Data Exploration, results='hide', error=FALSE, message=FALSE, warning=FALSE}
 # Mean number of hourly parking sessions
 
 ParkingMeter_census %>%
@@ -329,7 +354,7 @@ ParkingMeter_census %>%
   group_by(StationID, time_of_day)%>%
   summarize(mean_trips = mean(n))%>%
   ggplot()+
-  geom_histogram(aes(mean_trips), binwidth = 1)+
+  geom_histogram(aes(mean_trips), binwidth = 1, fill = "#91ccc3")+
   labs(title="Mean Number of Hourly Parking Sessions Per Block,\nSan Francisco, April - May, 2018",
        x="Number of Sessions", 
        y="Frequency")+
@@ -341,7 +366,7 @@ ParkingMeter_census %>%
 ggplot(ParkingMeter_census %>%
          group_by(interval60, StationID) %>%
          tally())+
-  geom_histogram(aes(n), binwidth = 2)+
+  geom_histogram(aes(n), binwidth = 2, fill = "#91ccc3")+
   labs(title="Parking Sessions per hr by block,\nSan Francisco, April-May, 2018",
        x="Number of Blocks", 
        y="Session Counts")+
@@ -350,7 +375,7 @@ ggplot(ParkingMeter_census %>%
 # Number of parking sessions by hour in a week
 
 ggplot(ParkingMeter_census %>% mutate(hour = hour(SESSION_END_DT)))+
-  geom_freqpoly(aes(hour, color = dotw), binwidth = 1)+
+  geom_freqpoly(aes(hour, color = dotw), binwidth = 1, size = 1)+
   labs(title="Parking Sessions by day of the week,\nSan Francisco, April-May, 2018",
        x="Hour", 
        y="Session Counts")+
@@ -506,7 +531,7 @@ ymax = st_bbox(sfbox)[[4]]
 
 ggplot() +
   geom_sf(data=sfbox, fill="black") +
-  geom_sf(data=st_as_sfc(st_bbox(sfbox)), colour="red", fill=NA)
+  geom_sf(data=st_as_sfc(st_bbox(sfbox)), colour="#df4d41", fill=NA)
 bars <- opq(bbox = c(xmin, ymin, xmax, ymax)) %>% 
   add_osm_feature(key = 'amenity', value = c("bar", "pub", "restaurant")) %>%
   osmdata_sf()
@@ -643,7 +668,7 @@ week_predictions %>%
   dplyr::select(week, Regression, MAE) %>%
   gather(Variable, MAE, -Regression, -week) %>%
   ggplot(aes(week, MAE)) + 
-  geom_bar(aes(fill = Regression), position = "dodge", stat="identity") +
+  geom_bar(aes(fill = Regression), color = "#df4d41", position = "dodge", stat="identity") +
   scale_fill_manual(values = palette6) +
   labs(title = "Mean Absolute Errors by model specification") +
   plotTheme()
@@ -659,7 +684,7 @@ week_predictions %>%
   group_by(Regression, Variable, interval60) %>%
   summarize(Value = sum(Value)) %>%
   ggplot(aes(interval60, Value, colour=Variable)) + 
-  geom_line(size = 1.1) + 
+  geom_line(size = 1.1, color = "#df4d41") + 
   facet_wrap(~Regression, ncol=1) +
   labs(title = "Predicted/Observed bike share time series", subtitle = "SF + Alameda",  x = "Hour", y= "Station Trips") +
   plotTheme()
