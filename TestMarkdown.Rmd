@@ -384,7 +384,6 @@ ggplot(ParkingMeter_census %>%
        y="Number of Sessions", caption = "Figure 2")+
   plotTheme()
 ```
-
 Figure 3 through 5 further illustrate the time and frequency of the data and confirm the consistent pattern between days of the week and the single peak over the course of each day. 
 
 ```{r Data Exploration 2, results='hide', error=FALSE, message=FALSE, warning=FALSE}
@@ -464,7 +463,7 @@ ggplot()+
 
 The animation in Figure 7 further reveals the spatial pattern of parking sessions over the course of one day. The animation confirms what the our previous data exploration showed, that parking sessions become densest at one peak during midday.
 
-```{r Panels, results='hide', error=FALSE, message=FALSE, warning=FALSE}
+```{r Animation, results='hide', error=FALSE, message=FALSE, warning=FALSE}
 library(gganimate)
 library(gifski)
 
@@ -513,7 +512,7 @@ animate(rideshare_animation, duration=20, renderer = gifski_renderer())
 ## <font face= "Georgia" span style="color: #97ccc4ff;">Feature Engineering</span>
 <font face= "Arial" span style="color: black;"></span>
 
-After our initial data exploration, we began fine-tuning our predictive model. Before we begin adding features, we first create a time-series panel, which creates a unique combination of each block to the hour and day. This creates create a “panel” dataset where each time period is represented by a row, whether a parking session took place then or not. If a block did not have any parking sessions on it a given hour, a zero in that spot in the panel. If we had more processing power, this could be done at the fifteen or even ten minute intervals.
+Before we begin adding features, we first create a time-series panel, which creates a unique combination of each block to the hour and day. This creates create a “panel” dataset where each time period is represented by a row, whether a parking session took place then or not. If a block did not have any parking sessions on it a given hour, a zero in that spot in the panel. If we had more processing power, this could be done at the fifteen or even ten minute intervals.
 
 The panel is created by making an empty data frame study.panel, that has each unique space/time observation. This is done using the expand.grid function and unique. We then join the block, tract and latitude and longitude and create the full panel by summarizing counts by block for each time interval. We keep census info and the latitude and longitude information  to join with our engineered features.
 
@@ -559,9 +558,9 @@ ride.panel <-
 
 As shown in the exploratory analysis, the time of day makes a difference in the number of parking sessions per block. Here we create time lag variables which will give us additional information about the number of ending sessions during a given time period.
 
-Table 1 shows that there is are strong correlations between the number of sessions and each of the time lags. The strongest positive correlation was with the one hour time lag (r=0.91). This makes sense, because as shown the exploratory analysis, the number of parking sessions ending follows a pronounced patter every day. The number of parking sessions ending for a specific hour is similar to that of the next hour and as the strong positive correlation with the one day lag (r=0.75), the next day as well. Thus, the lag features were included in the predictive model as well as a time of day feature.
+Table 1 shows that there is are strong correlations between the number of sessions and each of the time lags. The strongest positive correlation was with the one hour time lag (r=0.91). This makes sense, because as shown the exploratory analysis, the number of parking sessions ending follows a pronounced patter every day. The number of parking sessions ending for a specific hour is similar to that of the next hour and as the strong positive correlation with the one day lag (r=0.75), the next day as well. Thus, the lag features were included in the predictive model.
 
-```{r add time lags, results='hide', error=FALSE, message=FALSE, warning=FALSE}
+```{r add time lags, results='asis', error=FALSE, message=FALSE, warning=FALSE}
 #add time lags feature
 
 library(kableExtra)
@@ -585,18 +584,6 @@ ride.panel <-
 first_column <- c("Time Lag","Lag (1 hour)", "Lag (2 hours)","Lag (3 hours)","Lag (4 hours)","Lag (12 Hours)","Lag (1 day)")
 second_column <- c("Correlation","0.91","0.74","0.53","0.32","-0.73","0.75")
 
-# add time of day feature
-
-ride.panel<-
-  ride.panel%>%
-  mutate(
-       time_of_day = case_when(hour(interval60) < 7 | hour(interval60) > 18 ~ "Overnight",
-                               hour(interval60) >= 7 & hour(interval60) < 10 ~ "AM Rush",
-                               hour(interval60) >= 10 & hour(interval60) < 15 ~ "Mid-Day",
-                               hour(interval60) >= 15 & hour(interval60) <= 18 ~ "PM Rush"))
-
-# create lag correlation table
-
 lag_correlation <- data.frame(first_column, second_column)
 
 kable(lag_correlation,format = "html", col.names = c('', '')) %>% 
@@ -605,7 +592,6 @@ kable(lag_correlation,format = "html", col.names = c('', '')) %>%
            general = "Table 1")
 ```
 
-The demand for parking is likely dependent on nearby amenities and also if transit access is available. We added two exposure features to our predictive model - proximity to bars and restaurants and distance to transit - to help account for this. We also included the neighborhood in the predictive model since the number of parking sessions seemed to vary over space.
 
 ```{r add features, results='hide', error=FALSE, message=FALSE, warning=FALSE}
 # add distance to bars/restaurants
@@ -682,232 +668,13 @@ ride.panel <-
   mutate(
     station_dist = nn_function(st_coordinates(ride.panel), st_coordinates(transit_stops), 1))
 
-```
+# add time of day feature
 
-## <font face= "Georgia" span style="color: #97ccc4ff;">Testing the Model</span>
-<font face= "Arial" span style="color: black;"></span>
-
-We created six linear models using the lm function. The first models included only temporal information, but the later ones contained all of the time lag information and other exposure features modeled in the previous section. We evaluated the predictive power of each model by dividing the dataset into a training set and a test set that allowed us to test how our model might perform on a real dataset. As mentioned previously, Monday through Wednesday were grouped into the training set, and Thursday and Friday were grouped into the test set. To test the accuracy of each model we used k-fold cross validation to determine the lowest mean absolute error (MAE). After selecting a model, we then analyzed how good the model was at predicting across neighborhoods and looked for clustering of errors.
-
-```{r testing data, results='hide', error=FALSE, message=FALSE, warning=FALSE}
-# create training and test data
-
-ride.Train <- subset(ride.panel, dotw %in% c("Mon","Tue","Wed"))
-ride.Test <- subset(ride.panel, dotw %in% c("Thu","Fri"))
-
-# test 5 different regressions
-
-reg1 <- lm(Trip_Count ~  hour(interval60),  data=ride.Train)
-
-reg2 <- lm(Trip_Count ~  StationID,  data=ride.Train)
-
-reg3 <- lm(Trip_Count ~  StationID + hour(interval60), 
-           data=ride.Train)
-
-reg4 <- lm(Trip_Count ~  StationID +  hour(interval60) +
-             lagHour + lag2Hours + lag3Hours + lag12Hours + lag1day, 
-           data=ride.Train)
-reg5 <- lm(Trip_Count ~  StationID +  hour(interval60) +
-             lagHour + lag2Hours + lag3Hours + lag12Hours + lag1day +bar_dist +station_dist, 
-           data=ride.Train)
-reg6 <-lm(Trip_Count ~  StationID +  hour(interval60) +
-            lagHour + lag2Hours + lag3Hours + lag12Hours + lag1day +bar_dist +station_dist+name+time_of_day, 
-          data=ride.Train)
-
-# Predict on test data
-
-ride.Test.weekNest <- 
-  ride.Test %>%
-  nest(-week) 
-
-model_pred <- function(dat, fit){
-  pred <- predict(fit, newdata = dat)}
-
-week_predictions <- 
-  ride.Test.weekNest %>% 
-  mutate(ATime_FE = map(.x = data, fit = reg1, .f = model_pred),
-         BSpace_FE = map(.x = data, fit = reg2, .f = model_pred),
-         CTime_Space_FE = map(.x = data, fit = reg3, .f = model_pred),
-         DTime_Space_FE_timeLags = map(.x = data, fit = reg4, .f = model_pred),
-         ETime_Space_FE_timeLags_Features = map(.x = data, fit = reg5, .f = model_pred),
-         All_features=map(.x = data, fit = reg6, .f = model_pred)) %>% 
-  gather(Regression, Prediction, -data, -week) %>%
-  mutate(Observed = map(data, pull, Trip_Count),
-         Absolute_Error = map2(Observed, Prediction,  ~ abs(.x - .y)),
-         MAE = map_dbl(Absolute_Error, mean, na.rm = TRUE),
-         sd_AE = map_dbl(Absolute_Error, sd, na.rm = TRUE))
-
-week_predictions
-
-```
-
-```{r testing data, results='hide', error=FALSE, message=FALSE, warning=FALSE}
-# Cross validation
-
-library(caret)
-
-netsample <- sample_n(ride.panel, 100)%>%
-  na.omit()
-
-fitControl <- trainControl(method = "cv", 
-                           number = 100,
-                           savePredictions = TRUE)
-
-set.seed(1000)
-
-# for k-folds CV
-
-reg.cv <-  
-  train(Trip_Count ~ StationID +  hour(interval60) +
-          lagHour + lag2Hours + lag3Hours + lag12Hours + lag1day +bar_dist +station_dist+name+time_of_day, 
-        data = netsample,  
-        method = "lm",  
-        trControl = fitControl,  
-        na.action = na.pass)
-
-reg.cv
-
-# predictions
-
-week_predictions <- 
-  ride.Test.weekNest %>% 
-  mutate(ATime_FE = map(.x = data, fit = reg1, .f = model_pred),
-         BSpace_FE = map(.x = data, fit = reg2, .f = model_pred),
-         CTime_Space_FE = map(.x = data, fit = reg3, .f = model_pred),
-         DTime_Space_FE_timeLags = map(.x = data, fit = reg4, .f = model_pred),
-         ETime_Space_FE_timeLags_Features = map(.x = data, fit = reg5, .f = model_pred),
-         All_features=map(.x = data, fit = reg6, .f = model_pred)) %>% 
-  gather(Regression, Prediction, -data, -week) %>%
-  mutate(Observed = map(data, pull, Trip_Count),
-         Absolute_Error = map2(Observed, Prediction,  ~ abs(.x - .y)),
-         MAE = map_dbl(Absolute_Error, mean, na.rm = TRUE),
-         sd_AE = map_dbl(Absolute_Error, sd, na.rm = TRUE))
-
-# Bar plot comparing predictions
-
-week_predictions %>%
-  dplyr::select(week, Regression, MAE) %>%
-  gather(Variable, MAE, -Regression, -week) %>%
-  ggplot(aes(week, MAE)) + 
-  geom_bar(aes(fill = Regression), color = "#df4d41", position = "dodge", stat="identity") +
-  scale_fill_manual(values = palette6) +
-  labs(title = "Mean Absolute Errors by model specification") +
-  plotTheme()
-
-# Graph of predictions
-
-week_predictions %>% 
-  mutate(interval60 = map(data, pull, interval60),
-         StationID = map(data, pull, StationID)) %>%
-  dplyr::select(interval60, StationID, Observed, Prediction, Regression) %>%
-  unnest() %>%
-  gather(Variable, Value, -Regression, -interval60, -StationID) %>%
-  group_by(Regression, Variable, interval60) %>%
-  summarize(Value = sum(Value)) %>%
-  ggplot(aes(interval60, Value, colour=Variable)) + 
-  geom_line(size = 1.1, color = "#df4d41") + 
-  facet_wrap(~Regression, ncol=1) +
-  labs(title = "Predicted/Observed bike share time series", subtitle = "SF + Alameda",  x = "Hour", y= "Station Trips") +
-  plotTheme()
-
-# MAE by block
-
-week_predictions_plot <-week_predictions %>% 
-  mutate(interval60 = map(data, pull, interval60),
-         StationID = map(data, pull, StationID), 
-         LATITUDE2 = map(data, pull, LATITUDE2), 
-         LONGITUDE2 = map(data, pull, LONGITUDE2),
-         dotw = map(data, pull, dotw) ) %>%
-  select(interval60, StationID, LATITUDE2, 
-         LONGITUDE2, Observed, Prediction, Regression,
-         dotw) %>%
-  unnest() %>%
-  filter(Regression == "All_features")%>%
+ride.panel<-
+  ride.panel%>%
   mutate(
-    time_of_day = case_when(hour(interval60) < 7 | hour(interval60) > 18 ~ "Overnight",
-                            hour(interval60) >= 7 & hour(interval60) < 10 ~ "AM Rush",
-                            hour(interval60) >= 10 & hour(interval60) < 15 ~ "Mid-Day",
-                            hour(interval60) >= 15 & hour(interval60) <= 18 ~ "PM Rush")) %>%
-  group_by(StationID, time_of_day, LONGITUDE2, LATITUDE2) %>%
-  summarize(MAE = mean(abs(Observed-Prediction), na.rm = TRUE))
-week_predictions_plot <- week_predictions_plot[!(week_predictions_plot$LATITUDE2 == ""), ]
-week_predictions_plot <- week_predictions_plot[!(week_predictions_plot$LONGITUDE2 == ""), ]
-week_predictions_plot <- st_as_sf(x = week_predictions_plot, coords = c("LONGITUDE2","LATITUDE2"),crs = "+proj=longlat +crs = 'EPSG:6339'")
-week_predictions_plot<- st_transform(week_predictions_plot,"EPSG:6339")
-
-ggplot()+
-  geom_sf(data = sfTracts %>%
-            st_transform(crs='EPSG:6339'), colour = '#efefef')+
-  geom_sf(data=week_predictions_plot,aes( color = MAE), 
-             fill = "transparent", alpha = 0.4)+
-  scale_colour_viridis(direction = -1,
-                       discrete = FALSE, option = "D")+
-  labs(title="Mean Abs Error, Test Set")+
-  mapTheme()
-
-# Scatterplot of predictions
-
-week_predictions %>% 
-  mutate(interval60 = map(data, pull, interval60),
-         start_station_id = map(data, pull, StationID), 
-         start_station_latitude = map(data, pull, LATITUDE2), 
-         start_station_longitude = map(data, pull, LONGITUDE2),
-         dotw = map(data, pull, dotw)) %>%
-  select(interval60, start_station_id, start_station_longitude, 
-         start_station_latitude, Observed, Prediction, Regression,
-         dotw) %>%
-  unnest() %>%
-  filter(Regression == "All_features")%>%
-  mutate(weekend = ifelse(dotw %in% c("Sun", "Sat"), "Weekend", "Weekday"),
-         time_of_day = case_when(hour(interval60) < 7 | hour(interval60) > 18 ~ "Overnight",
-                                 hour(interval60) >= 7 & hour(interval60) < 10 ~ "AM Rush",
-                                 hour(interval60) >= 10 & hour(interval60) < 15 ~ "Mid-Day",
-                                 hour(interval60) >= 15 & hour(interval60) <= 18 ~ "PM Rush"))%>%
-  ggplot()+
-  geom_point(aes(x= Observed, y = Prediction))+
-  geom_smooth(aes(x= Observed, y= Prediction), method = "lm", se = FALSE, color = "red")+
-  geom_abline(slope = 1, intercept = 0)+
-  facet_grid(~time_of_day)+
-  labs(title="Observed vs Predicted",
-       x="Observed trips", 
-       y="Predicted trips")+
-  plotTheme()
-
-
-# map error
-
-week_predictions_plot <-week_predictions %>% 
-  mutate(interval60 = map(data, pull, interval60),
-         StationID = map(data, pull, StationID), 
-         LATITUDE2 = map(data, pull, LATITUDE2), 
-         LONGITUDE2 = map(data, pull, LONGITUDE2),
-         dotw = map(data, pull, dotw) ) %>%
-  select(interval60, StationID, LATITUDE2, 
-         LONGITUDE2, Observed, Prediction, Regression,
-         dotw) %>%
-  unnest() %>%
-  filter(Regression == "All_features")%>%
-  mutate(
-    time_of_day = case_when(hour(interval60) < 7 | hour(interval60) > 18 ~ "Overnight",
-                            hour(interval60) >= 7 & hour(interval60) < 10 ~ "AM Rush",
-                            hour(interval60) >= 10 & hour(interval60) < 15 ~ "Mid-Day",
-                            hour(interval60) >= 15 & hour(interval60) <= 18 ~ "PM Rush")) %>%
-  group_by(StationID, time_of_day, LONGITUDE2, LATITUDE2) %>%
-  summarize(MAE = mean(abs(Observed-Prediction), na.rm = TRUE))
-week_predictions_plot <- week_predictions_plot[!(week_predictions_plot$LATITUDE2 == ""), ]
-week_predictions_plot <- week_predictions_plot[!(week_predictions_plot$LONGITUDE2 == ""), ]
-week_predictions_plot <- st_as_sf(x = week_predictions_plot, coords = c("LONGITUDE2","LATITUDE2"),crs = "+proj=longlat +crs = 'EPSG:6339'")
-week_predictions_plot<- st_transform(week_predictions_plot,"EPSG:6339")
-
-
-ggplot()+
-  geom_sf(data = sfTracts %>%
-            st_transform(crs='EPSG:6339'), colour = '#efefef')+
-  geom_sf(data=week_predictions_plot,aes( color = MAE), 
-          fill = "transparent", size = 0.5, alpha = 1.5)+
-  scale_colour_viridis(direction = -1,
-                       discrete = FALSE, option = "D")+
-  labs(title="Mean Absolute Errors, Test Set")+
-  facet_grid(~time_of_day)+
-  mapTheme()
+       time_of_day = case_when(hour(interval60) < 7 | hour(interval60) > 18 ~ "Overnight",
+                               hour(interval60) >= 7 & hour(interval60) < 10 ~ "AM Rush",
+                               hour(interval60) >= 10 & hour(interval60) < 15 ~ "Mid-Day",
+                               hour(interval60) >= 15 & hour(interval60) <= 18 ~ "PM Rush"))
 ```
