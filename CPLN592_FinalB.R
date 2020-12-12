@@ -512,6 +512,31 @@ week_predictions <-
 
 week_predictions
 
+#week predictions plot neighborhood
+week_predictions_plot_neighbor2 <-week_predictions %>% 
+  mutate(interval60 = map(data, pull, interval60),
+         name = map(data,pull,name),
+         StationID = map(data, pull, StationID), 
+         LATITUDE2 = map(data, pull, LATITUDE2), 
+         LONGITUDE2 = map(data, pull, LONGITUDE2),
+         dotw = map(data, pull, dotw) ) %>%
+  dplyr::select(interval60, StationID, LATITUDE2, 
+                LONGITUDE2, Observed, Prediction, Regression,
+                dotw,name) %>%
+  unnest() %>%
+  filter(Regression == "All_features")%>%
+  mutate(
+    time_of_day = case_when(hour(interval60) < 7 | hour(interval60) > 18 ~ "Overnight",
+                            hour(interval60) >= 7 & hour(interval60) < 10 ~ "AM Rush",
+                            hour(interval60) >= 10 & hour(interval60) < 15 ~ "Mid-Day",
+                            hour(interval60) >= 15 & hour(interval60) <= 18 ~ "PM Rush")) %>%
+  group_by(StationID, time_of_day, LONGITUDE2, LATITUDE2,name) %>%
+  summarize(MAE = mean(abs(Observed-Prediction), na.rm = TRUE))
+week_predictions_plot_neighbor2 <- week_predictions_plot_neighbor2[!(week_predictions_plot_neighbor2$LATITUDE2 == ""), ]
+week_predictions_plot_neighbor2 <- week_predictions_plot_neighbor2[!(week_predictions_plot_neighbor2$LONGITUDE2 == ""), ]
+week_predictions_plot_neighbor2 <- st_as_sf(x = week_predictions_plot_neighbor2, coords = c("LONGITUDE2","LATITUDE2"),crs = "+proj=longlat +crs = 'EPSG:6339'")
+week_predictions_plot_neighbor2<- st_transform(week_predictions_plot_neighbor2,"EPSG:6339")
+
 ## Cross validation
 library(caret)
 
@@ -1143,3 +1168,29 @@ ggmap(map, extent = "device") +
                                    fill = ..level.., alpha = ..level..), geom = 'polygon', binwidth =1) +
   scale_fill_gradient(name = "Sessions", low = "green", high = "red") +
   guides(alpha = FALSE)
+# Graph of predictions
+
+week_predictions %>% 
+  mutate(interval60 = map(data, pull, interval60),
+         StationID = map(data, pull, StationID)) %>%
+  dplyr::select(interval60, StationID, Observed, Prediction, Regression) %>%
+  unnest() %>%
+  gather(Variable, Value, -Regression, -interval60, -StationID) %>%
+  group_by(Regression, Variable, interval60) %>%
+  summarize(Value = sum(Value)) %>%
+  ggplot(aes(interval60, Value, colour=Variable)) + 
+  geom_line(size = 1.1, color = "#de564d") + 
+  facet_wrap(~Regression, ncol=1) +
+  labs(title = "Predicted/Observed bike share time series", subtitle = "SF + Alameda",  x = "Hour", y= "Station Trips",caption="Figure 8") +
+  plotTheme()
+
+ggplot()+
+  geom_sf(data = sfTracts %>%
+            st_transform(crs='EPSG:6339'), colour = '#efefef')+
+  geom_sf(data=week_predictions_plot,aes( color = MAE), 
+          fill = "transparent", size = 0.5, alpha = 1.5)+
+  scale_colour_viridis(direction = -1,
+                       discrete = FALSE, option = "D")+
+  labs(title="Mean Absolute Errors, Test Set")+
+  facet_grid(~time_of_day)+
+  mapTheme()
