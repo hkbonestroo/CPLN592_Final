@@ -54,7 +54,7 @@ How does this benefit city governments? We estimate that an average $75 ticket c
 <font face= "Arial" span style="color: black;"></span>
 How does the app predict where parking infractions are likely to occur? The app uses a parking meter dataset to predict the place and time of the ending of parking sessions. Our analysis has shown that weekdays are very similar to one another and that the number of parking sessions has a single peak in the middle of each day. 
 
-The model incorporates various features in order to improve the accuracy of its predictions. These features include distance to transit, neighborhood, time of day, and distance to bars and restaurants. Because of the size of the underlying dataset, a single week of data was used to inform predictions. This week was chosen because it had good weather and no holidays. For that reason, weather and holidays were not included as predictors.
+The model incorporates various spatial features in order to improve the accuracy of its predictions. These features include distance to transit, neighborhood, time of day, and distance to bars and restaurants. Because of the size of the underlying dataset, a single week of data was used to inform predictions. This week was chosen because it had good weather and no holidays. For that reason, weather and holidays were not included as predictors.
 
 
 ## <font face= "Georgia" span style="color: #97ccc4ff;">Setup</span>
