@@ -10,11 +10,11 @@ output:
 ---
 https://youtu.be/cjLabqlZNxA
 
-# <font face= "Georgia" span style="color: #97ccc4ff;">Introduction</span>
+# <font face= "Georgia" span style="color: #97ccc4ff;">Denizen - A Better Way to Give Parking Tickets</span>
 ## <font face= "Georgia" span style="color: #97ccc4ff;">The Use Case</span> 
 
 <font face= "Arial" span style="color: black;"></span> 
-Nobody likes getting a parking ticket, but administering parking tickets is actually beneficial for cities in a variety of ways. Consistent parking enforcement by city governments leads to greater respect for parking regulations, fewer instances of illegal parking that may obstruct traffic or endanger bicyclists and pedestrians, and more dollars of ticket revenue that are critical to so many city budgets. For these reasons, cities should be interested in strategies that allow more consistently enforcement of parking regulations in order to maximize the social and financial benefits that are likely to result. 
+A parking ticket is the last thing any driver who has parked in a city wants to find upon returning to their car. However, despite the frustration that tickets cause drivers, administering parking tickets is actually a beneficial for cities in a variety of ways. Cities that consistently enforce parking regulations by giving out parking tickets promote greater respect for parking rules by drivers, discourage future instances of illegal parking that may obstruct traffic or endanger bicyclists and pedestrians, and generate more dollars of parking ticket revenue that are critical for so many public services. For these reasons, cities should be interested in strategies that allow them to more efficiently administer parking tickets in order to maximize the social and financial benefits that are likely to result. 
 
 Most cities employ a workforce of parking enforcement officers that are responsible for identifying illegally parked vehicles and administering tickets. For this project, we set out to design a new approach to parking enforcement that would both increase the volume and reduce the costs of parking ticket administration for cities. 
 
@@ -56,14 +56,16 @@ How does the app predict where parking infractions are likely to occur? The app 
 
 The model incorporates various features in order to improve the accuracy of its predictions. These features include distance to transit, neighborhood, time of day, and distance to bars and restaurants. Because of the size of the underlying dataset, a single week of data was used to inform predictions. This week was chosen because it had good weather and no holidays. For that reason, weather and holidays were not included as predictors.
 
+
+## <font face= "Georgia" span style="color: #97ccc4ff;">Setup</span>
+
 This document provides a step-by-step overview of our model creation and analysis. This process can be followed to not only replicate our model for similar uses cases but also for a plethora of other diverse use cases. A similar process could be used for other parking related problems such as predicting parking demand to implement surge pricing, re-balancing bikeshare systems, or predicting transit station traffic.
 
 It is important to note that this model provides a simplified version of what the finalized app would do. In order to create a more fully realized product would take much more time and processing power than this project allotted.  
 
-## <font face= "Georgia" span style="color: #97ccc4ff;">Setup</span>
 <font face= "Arial" span style="color: black;"></span>
 Begin by conducting an initial setup and loading in all the required libraries and functions. 
-Load data for San Francisco geometry including county lines and neighborhood outlines. Load San Francisco census data including median income, median age, percentage of white population, travel time to work, number of commuters, means of public transit, and total public transit usage. Additioanlly, load San Francisco census tract geometry. 
+Load data for San Francisco geometry including county lines and neighborhood outlines. Load San Francisco census data including median income, median age, percentage of white population, travel time to work, number of commuters, means of public transit, and total public transit usage. Additionally, load San Francisco census tract geometry. 
 
 ```{r setup, results='hide', error=FALSE, message=FALSE, warning=FALSE}
 #setting working directory
@@ -223,7 +225,7 @@ sfTracts <-
 
 ```
 
-Next, load in the data. We used [SFMTA Parking Meter Detailed Revenue Transactions](https://data.sfgov.org/Transportation/SFMTA-Parking-Meter-Detailed-Revenue-Transactions/imvp-dq3v) data from SFData. This dataset included every single parking meter transaction in San Francisco where where each row equals a single transaction by a single customer at a single meter in San Francisco. Because the dataset was so large, we downloaded parking meter usage data for only one work week - from April 30th to May 4th of 2018. We selected this week due to its consistent weather and lack of holidays. We then cleaned the data by selecting only relevant variables and filtering for only street parking. We next created time intervals for each paring session's end time using the lubridate package. For the purposes of this project, we assumed that every ending parking session was equally likely to have expired. We finally joined the dataset to a [file containing the geometry of every parking meter](https://data.sfgov.org/Transportation/Parking-Meters/8vzz-qzz9)in San Francisco. Each parking meter was assigned to its relevant block. 
+Next, load in the data. We used [SFMTA Parking Meter Detailed Revenue Transactions](https://data.sfgov.org/Transportation/SFMTA-Parking-Meter-Detailed-Revenue-Transactions/imvp-dq3v) data from SFData. This dataset included every single parking meter transaction in San Francisco where where each row equals a single transaction by a single customer at a single meter in San Francisco. Because the dataset was so large, we downloaded parking meter usage data for only one work week - from April 30th to May 4th of 2018. We selected this week due to its consistent weather and lack of holidays. We then cleaned the data by selecting only relevant variables and filtering for only street parking. We next created time intervals for each paring session's end time using the lubridate package. For the purposes of this project, we assumed that every ending parking session was equally likely to have expired. We finally joined the dataset to a [file containing the geometry of every parking meter](https://data.sfgov.org/Transportation/Parking-Meters/8vzz-qzz9) in San Francisco. Each parking meter was assigned to its relevant block. 
 
 ```{r Loading Geometries, results='hide', error=FALSE, message=FALSE, warning=FALSE}
 
@@ -348,7 +350,7 @@ weather.Panel <-
 
 grid.arrange(
   ggplot(weather.Panel, aes(interval60,Precipitation)) + geom_line(color = "#91ccc3", size = 1) + 
-    labs(title="Percipitation", x="Hour", y="Perecipitation") + plotTheme(),
+    labs(title="Precipitation", x="Hour", y="Precipitation") + plotTheme(),
   ggplot(weather.Panel, aes(interval60,Wind_Speed)) + geom_line(color = "#91ccc3", size = 1) + 
     labs(title="Wind Speed", x="Hour", y="Wind Speed") + plotTheme(),
   ggplot(weather.Panel, aes(interval60,Temperature)) + geom_line(color = "#91ccc3", size = 1) + 
@@ -452,7 +454,7 @@ ggplot()+
   mapTheme()
 ```
 
-The animation in Figure 7 further reveals the spatial pattern of parking sessions over the course of one day. The animation confirms what the our previous data exploration showed, that parking sessions become densest at one peak during midday.
+The animation in Figure 7 further reveals the spatial pattern of parking sessions over the course of one day. The animation confirms, similarly to our previous data exploration, that parking sessions become most dense at a singular peak during midday.
 
 ```{r Ride Panels, error=FALSE, message=FALSE, warning=FALSE}
 library(gganimate)
@@ -503,9 +505,9 @@ animate(rideshare_animation, duration=20, renderer = gifski_renderer())
 ## <font face= "Georgia" span style="color: #97ccc4ff;">Feature Engineering</span>
 <font face= "Arial" span style="color: black;"></span>
 
-After our initial data exploration, we began fine-tuning our predictive model. Before we begin adding features, we first create a time-series panel, which creates a unique combination of each block to the hour and day. This creates create a “panel” dataset where each time period is represented by a row, whether a parking session took place then or not. If a block did not have any parking sessions on it a given hour, a zero in that spot in the panel. If we had more processing power, this could be done at the fifteen or even ten minute intervals.
+After our initial data exploration, we begin fine-tuning our predictive model. Before we begin adding features, we first create a time-series panel, which creates a unique combination of each block to the hour and day. This creates a “panel” dataset where each time period is represented by a row, whether or not a parking session took place at that time. If a block did not have any parking sessions on it in a given hour, it receives a zero in that spot in the panel. If we had more processing power, this process could be done at fifteen or even ten minute intervals.
 
-The panel is created by making an empty data frame study.panel, that has each unique space/time observation. This is done using the expand.grid function and unique. We then join the block, tract and latitude and longitude and create the full panel by summarizing counts by block for each time interval. We keep census info and the latitude and longitude information  to join with our engineered features.
+The panel is created by making an empty data frame study.panel, that has each unique space/time observation. This is done using the expand.grid function and unique. We then join the block, tract, and latitude and longitude and create the full panel by summarizing counts by block for each time interval. We keep census info and the latitude and longitude information to join with our engineered features.
 
 ```{r Panels, results='hide', error=FALSE, message=FALSE, warning=FALSE}
 # create study panel
@@ -549,7 +551,7 @@ ride.panel <-
 
 As shown in the exploratory analysis, the time of day makes a difference in the number of parking sessions per block. Here we create time lag variables which will give us additional information about the number of ending sessions during a given time period.
 
-Table 1 shows that there is are strong correlations between the number of sessions and each of the time lags. The strongest positive correlation was with the one hour time lag (r=0.91). This makes sense, because as shown the exploratory analysis, the number of parking sessions ending follows a pronounced patter every day. The number of parking sessions ending for a specific hour is similar to that of the next hour and as the strong positive correlation with the one day lag (r=0.75), the next day as well. Thus, the lag features were included in the predictive model.
+Table 1 shows that there is are strong correlations between the number of sessions and each of the time lags. The strongest positive correlation was with the one hour time lag (r=0.91). This makes sense, because as shown in the exploratory analysis, the number of parking sessions ending follows a pronounced pattern every day. The number of parking sessions ending for a specific hour is similar to that of the next hour and has strong positive correlation with the one day lag (r=0.75) the next day as well. Thus, the lag features were included in the predictive model.
 
 ```{r add time lags, results='asis', error=FALSE, message=FALSE, warning=FALSE}
 #add time lags feature
@@ -595,7 +597,7 @@ kable(lag_correlation,format = "html", col.names = c('', '')) %>%
            general = "Table 1")
 ```
 
-The demand for parking is likely dependent on nearby amenities and also if transit access is available. We added two exposure features to our predictive model - proximity to bars and restaurants and distance to transit - to help account for this. We also included the neighborhood in the predictive model since the number of parking sessions seemed to vary over space.
+The demand for parking is likely dependent on nearby amenities and accessibility to transit. We added two exposure features to our predictive model - proximity to bars and restaurants and distance to transit - to help account for this. We also included the neighborhood in the predictive model since the number of parking sessions seemed to vary over space.
 
 ```{r add features, results='hide', error=FALSE, message=FALSE, warning=FALSE}
 # add distance to bars/restaurants
@@ -679,7 +681,7 @@ ride.panel <-
 
 We created six linear models using the lm function. The first models included only temporal information, but the more advanced ones contained all of the time lag information and other exposure features added in the previous section. We evaluated the predictive power of each model by dividing the dataset into a training set and a test set that allowed us to test how our model might perform on a real dataset. As mentioned previously, Monday through Wednesday were grouped into the training set, and Thursday and Friday were grouped into the test set. To test the accuracy of each model we used k-fold cross validation to determine the lowest mean absolute error (MAE). After selecting a model, we then analyzed how good the model was at predicting across neighborhoods and looked for clustering of errors.
 
-For our initial analysis of the six models, we first created a function called model_pred which we fitted onto each data frame in our nested structure. As the output below and Figures 7 and 8 show, the MAE reduced as more features and temporal features were added to the regression. The model with all the features more closely resembles the temporal pattern of ending parking sessions than the other models.
+For our initial analysis of the six models, we first created a function called model_pred which we fitted onto each data frame in our nested structure. As the output below and Figures 7 and 8 show, the MAE decreased as more features and temporal features were added to the regression. The model with all the features more closely resembles the temporal pattern of ending parking sessions than the other models.
 
 ```{r testing data, error=FALSE, message=FALSE, warning=FALSE}
 # create training and test data
@@ -834,7 +836,7 @@ week_predictions %>%
 
 ```
 
-Cross validation can indicates the generalizability of a model. We took a sample of the data and ran a 100 k-fold cross validation test on it, using our sixth model which included all the features. Even with all the features, our MAE remained above 1. This indicates that our model is not that accurate. While the stakes for this project are not as high as other possible policy inquiries, a MAE that is this high may be problematic to our business model. A Denizen app user who goes to a block which is predicted to have many parking sessions ending but actually has none, may never use the app again. As mentioned previously, using a larger dataset with more features would allow for better accuracy and generalizability if this became an actual app. 
+Cross validation is one method of testing the generalizability of a model. We took a sample of the data and ran a 100 k-fold cross validation test on it using our sixth model which included all the features. Even with all the features, our MAE remained above 1. This indicates that our model is not as accurate as would be desired. While the stakes for this project are not as high as other possible policy inquiries, a MAE that is this high may be problematic if it were to be implemented. A Denizen app user who goes to a block which is predicted to have many parking sessions ending but finds none may be less inclined to use the app again. As mentioned previously, using a larger dataset with more features would allow for better accuracy and generalizability if this app was implemented. 
 
 ```{r MAE, error=FALSE, message=FALSE, warning=FALSE}
 # Cross validation
@@ -863,7 +865,7 @@ reg.cv <-
 reg.cv
 ```
 
-As Figures 9 and 10 show, the MAE in some areas of the city are more of a problem then others.In the plot below, higher errors are represented by purple dots, while lower errors are represented by yellow dots. The map seems to suggests that our errors have spatial autocorrelation, which is to say that the instances of high errors seem to be clustered with the MAE is especially high in the Miraloma Park and Merced Manor neighbrhoods. This inidcates that there are certain features about this area that make the model not generalizable to this area. Specific exposure features to that area might help improve the results.
+As Figures 9 and 10 show, the MAE in some areas of the city is higher than in others. In the plot below, higher errors are represented by purple dots, while lower errors are represented by yellow dots. The map seems to suggests that our errors have spatial autocorrelation, which is to say that the instances of high errors seem to be clustered. For example, the MAE is especially high in the Miraloma Park and Merced Manor neighbrhoods. This indicates that there are certain characteristics of this area that make the model not particularly accurate when predicting parking behavior there. Specific exposure features to that area might help improve the results.
 
 ```{r graph predictions, results='hide', error=FALSE, message=FALSE, warning=FALSE}
 
@@ -940,7 +942,7 @@ week_predictions2 %>%
 ## <font face= "Georgia" span style="color: #97ccc4ff;">App Interface</span>
 <font face= "Arial" span style="color: black;"></span>
 
-After fine-tuning the model, we designed how the model would be used in the app. Using ggmap we used our model to create a heatmap which not only took in the density of blocks but also the number of predicted ending parking sessions at each block to identify hotspots. The following image shows the heatmap of predicted parking sessions ending for 1pm on Thursday. Using ggmap requires that you register a Google API. The API cannot be shared publicly, so in the following code, you would place your API in place of "your key." We performed the following code for several times of day.
+After fine-tuning the model, we attempted to viualize how the model would be integrated into the app. Using ggmap we used our model to create a heatmap which not only took in the density of blocks but also the number of predicted ending parking sessions at each block to identify hotspots. The following image shows the heatmap of predicted parking sessions ending for 1pm on Thursday. Using ggmap requires that you register a Google API. The API cannot be shared publicly, so in the following code, one would place their API in place of "your key." We performed the following code for several times of day.
 
 ```{r app interface, results='hide', error=FALSE, message=FALSE, warning=FALSE}
 ##preparing data for heatmap
@@ -1017,3 +1019,16 @@ The following image shows what this interface would like for an app user. Using 
 
 ## <font face= "Georgia" span style="color: #97ccc4ff;">Conclusion</span>
 <font face= "Arial" span style="color: black;"></span>
+
+Our app is likely to raise questions about the feasibility and ethics of allowing ordinary citizens, as opposed to government employees, to administer parking tickets. Before a strategy like this could be implemented, there would need to be a significant amount of planning and coordination with local governments. One of the likely areas of scrutiny would be safeguards against a situation where a car is flagged improperly by an app user for illegally parking when in reality a ticket is not deserved. The app would need to be built with a verification system that could cross check the date, time, and location of a submitted photo against local parking regulations to validate each instance of alleged illegal parking. Users who consistently submitted incorrect parking ticket submissions could also lose their privileges in the app. Another feature that would likely be of great interest to local governments is the feasibility, optics, and perhaps legality of awarding a percentage of the dollar amount of parking tickets back to a third party app provider, and in turn to app users. A financial compensation structure like this is not common and would likely require significant negotiation with government partners, whose approval would be necessary for implementation. Even if an app did promise to administer parking tickets at lower cost than the status quo of hiring parking enforcement officers, such an approach could very likely cause public uproar and political pressure against implementation. It is hard to predict how eager cities and their residents would be to embrace the approach we have proposed here, but we do think that there is an opportunity - whether with parking tickets or otherwise - to crowdsource certain government functions to the benefit of city governments and residents. In the same way that private sector companies like Uber and TaskRabbit have found ways to harness the power of freelance workers to great financial success, the public sector too should consider new and creative ways to deliver public services that new technologies have made possible. 
+
+
+
+Sources: 
+
+https://www.carrentals.com/blog/parking-tickets-cost-americans/#:~:text=What%20Parking%20Tickets%20Cost%20Drivers,in%20annual%20parking%20ticket%20revenue
+
+https://priceonomics.com/san-francisco-parking-meters-a-s130mm-industry/
+
+https://stories.freepik.com/
+
