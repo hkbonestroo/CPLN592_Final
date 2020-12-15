@@ -8,24 +8,23 @@ output:
     toc_float: true
     code_folding: hide
 ---
-https://youtu.be/cjLabqlZNxA
 
-# <font face= "Georgia" span style="color: #97ccc4ff;">Denizen - A Better Way to Give Parking Tickets</span>
-## <font face= "Georgia" span style="color: #97ccc4ff;">The Use Case</span> 
+# <font face= "Georgia" span style="color: #97ccc4;">Denizen - A Better Way to Give Parking Tickets</span>
+## <font face= "Georgia" span style="color: #97ccc4;">The Use Case</span> 
 
 <font face= "Arial" span style="color: black;"></span> 
 A parking ticket is the last thing any driver who has parked in a city wants to find upon returning to their car. However, despite the frustration that tickets cause drivers, administering parking tickets is actually a beneficial for cities in a variety of ways. Cities that consistently enforce parking regulations by giving out parking tickets promote greater respect for parking rules by drivers, discourage future instances of illegal parking that may obstruct traffic or endanger bicyclists and pedestrians, and generate more dollars of parking ticket revenue that are critical for so many public services. For these reasons, cities should be interested in strategies that allow them to more efficiently administer parking tickets in order to maximize the social and financial benefits that are likely to result. 
 
 Most cities employ a workforce of parking enforcement officers that are responsible for identifying illegally parked vehicles and administering tickets. For this project, we set out to design a new approach to parking enforcement that would both increase the volume and reduce the costs of parking ticket administration for cities. 
 
-## <font face= "Georgia" span style="color: #97ccc4ff;">Our Solution</span> 
+## <font face= "Georgia" span style="color: #97ccc4;">Our Solution</span> 
 
 <font face= "Arial" span style="color: black;"></span> 
-Our solution is an app called Denizen that allows cities to crowdsource their parking enforcement to ordinary citizens, and equips those citizens with the predictive power of big data. We want to allow anyone to give a parking ticket to vehicles that have parked illegally or for longer than they’ve paid at a meter.  Our app helps users identify locations likely to have parking infractions, report individual vehicles, and be rewarded for doing so. We think there is a significant opportunity to get ordinary citizens more involved in government activities in ways that beneficial for both parties, and we think parking ticket enforcement is a great use case to start with. 
+Our solution is an app called Denizen that allows cities to crowdsource their parking enforcement to ordinary citizens, and equips those citizens with the predictive power of big data. We want to allow anyone to give a parking ticket to vehicles that have parked illegally or for longer than they’ve paid at a meter.  Our app helps users identify locations likely to have parking infractions, report individual vehicles, and be rewarded for doing so. We think there is a significant opportunity to get ordinary citizens more involved in government activities in ways that beneficial for both parties, and we think parking ticket enforcement is a great use case to start with. More information about our solution can also be found through our informational [video](https://youtu.be/cjLabqlZNxA).
 
 ![](C:\\Users\\Hannah\\Documents\\Penn\\Fall 2020\\CPLN-592\\Assignments\\Final Project\\CPLN592_Final\\Presentation Images\\1.jpg)
 
-## <font face= "Georgia" span style="color: #97ccc4ff;">How does the app work?</span>
+## <font face= "Georgia" span style="color: #97ccc4;">How does the app work?</span>
 
 **<font face= "Georgia" span style="color: #de564d;">Step 1: Identify.</span>** <font face= "Arial" span style="color: black;"></span> Users will consult a heatmap in our app to identify the areas in their city most likely to have illegally parked cars at certain times of the day.
 
@@ -39,33 +38,30 @@ Our solution is an app called Denizen that allows cities to crowdsource their pa
 
 ![](C:\\Users\\Hannah\\Documents\\Penn\\Fall 2020\\CPLN-592\\Assignments\\Final Project\\CPLN592_Final\\Presentation Images\\4.jpg)
 
-## <font face= "Georgia" span style="color: #97ccc4ff;">Market Size</span>
+## <font face= "Georgia" span style="color: #97ccc4;">Market Size</span>
 <font face= "Arial" span style="color: black;"></span>
 How big is the market for parking tickets? Every year approximately $100MM of parking tickets are given in San Francisco alone. Across the largest 16 U.S. cities approximately $1.4Bn of parking tickets are given every year. 
 
-
-## <font face= "Georgia" span style="color: #97ccc4ff;">City Benefits</span> 
+## <font face= "Georgia" span style="color: #97ccc4;">City Benefits</span> 
 <font face= "Arial" span style="color: black;"></span>
 How does this benefit city governments? We estimate that an average $75 ticket costs San Francisco at least $16 in parking attendant salaries and benefits. We think our app could take a 10% fee and give users a 10% reward and still generate more net parking revenue for the city. 
 
-# <font face= "Georgia" span style="color: #97ccc4ff;">The Model</span>
-
-## <font face= "Georgia" span style="color: #97ccc4ff;">Overview</span>
+# <font face= "Georgia" span style="color: #97ccc4;">The Model</span>
+## <font face= "Georgia" span style="color: #97ccc4;">Overview</span>
 <font face= "Arial" span style="color: black;"></span>
 How does the app predict where parking infractions are likely to occur? The app uses a parking meter dataset to predict the place and time of the ending of parking sessions. Our analysis has shown that weekdays are very similar to one another and that the number of parking sessions has a single peak in the middle of each day. 
 
 The model incorporates various spatial features in order to improve the accuracy of its predictions. These features include distance to transit, neighborhood, time of day, and distance to bars and restaurants. Because of the size of the underlying dataset, a single week of data was used to inform predictions. This week was chosen because it had good weather and no holidays. For that reason, weather and holidays were not included as predictors.
 
 
-## <font face= "Georgia" span style="color: #97ccc4ff;">Setup</span>
+## <font face= "Georgia" span style="color: #97ccc4;">Setup</span>
+<font face= "Arial" span style="color: black;"></span>
 
 This document provides a step-by-step overview of our model creation and analysis. This process can be followed to not only replicate our model for similar uses cases but also for a plethora of other diverse use cases. A similar process could be used for other parking related problems such as predicting parking demand to implement surge pricing, re-balancing bikeshare systems, or predicting transit station traffic.
 
 It is important to note that this model provides a simplified version of what the finalized app would do. In order to create a more fully realized product would take much more time and processing power than this project allotted.  
 
-<font face= "Arial" span style="color: black;"></span>
-Begin by conducting an initial setup and loading in all the required libraries and functions. 
-Load data for San Francisco geometry including county lines and neighborhood outlines. Load San Francisco census data including median income, median age, percentage of white population, travel time to work, number of commuters, means of public transit, and total public transit usage. Additionally, load San Francisco census tract geometry. 
+Begin by conducting an initial setup and loading in all the required libraries and functions. Load data for San Francisco geometry including county lines and neighborhood outlines. Load San Francisco census data including median income, median age, percentage of white population, travel time to work, number of commuters, means of public transit, and total public transit usage. Additionally, load San Francisco census tract geometry. 
 
 ```{r setup, results='hide', error=FALSE, message=FALSE, warning=FALSE}
 #setting working directory
@@ -358,7 +354,7 @@ grid.arrange(
   top="Weather Data - San Francisco SFO - April-May, 2018")
 ```
 
-## <font face= "Georgia" span style="color: #97ccc4ff;">Data Exploration</span>
+## <font face= "Georgia" span style="color: #97ccc4;">Data Exploration</span>
 <font face= "Arial" span style="color: black;"></span>
 
 We begin by examining the time and frequency of our data. Figure 2 illustrates the number of parking sessions per hour during the week. While the consistency in sessions per day allows the model to predict parking sessions on Thursday and Friday based on the training data from Monday - Wednesday, more accuracy could potentially be obtained by predicting a week's worth of data based on the previous week. However, our limited processing power did not permit this.
@@ -502,7 +498,7 @@ rideshare_animation <-
 animate(rideshare_animation, duration=20, renderer = gifski_renderer())
 ```
 
-## <font face= "Georgia" span style="color: #97ccc4ff;">Feature Engineering</span>
+## <font face= "Georgia" span style="color: #97ccc4;">Feature Engineering</span>
 <font face= "Arial" span style="color: black;"></span>
 
 After our initial data exploration, we begin fine-tuning our predictive model. Before we begin adding features, we first create a time-series panel, which creates a unique combination of each block to the hour and day. This creates a “panel” dataset where each time period is represented by a row, whether or not a parking session took place at that time. If a block did not have any parking sessions on it in a given hour, it receives a zero in that spot in the panel. If we had more processing power, this process could be done at fifteen or even ten minute intervals.
@@ -676,7 +672,7 @@ ride.panel <-
 
 ```
 
-## <font face= "Georgia" span style="color: #97ccc4ff;">Testing the Model</span>
+## <font face= "Georgia" span style="color: #97ccc4;">Testing the Model</span>
 <font face= "Arial" span style="color: black;"></span>
 
 We created six linear models using the lm function. The first models included only temporal information, but the more advanced ones contained all of the time lag information and other exposure features added in the previous section. We evaluated the predictive power of each model by dividing the dataset into a training set and a test set that allowed us to test how our model might perform on a real dataset. As mentioned previously, Monday through Wednesday were grouped into the training set, and Thursday and Friday were grouped into the test set. To test the accuracy of each model we used k-fold cross validation to determine the lowest mean absolute error (MAE). After selecting a model, we then analyzed how good the model was at predicting across neighborhoods and looked for clustering of errors.
@@ -830,7 +826,7 @@ week_predictions %>%
   geom_line(size = 1.1,) + 
   facet_wrap(~Regression, ncol=1) +
   labs(title = "Predicted/Observed Parking Session Endings Time Series", subtitle = "San Francisco",  x = "Hour", y= "Parking Sessions",caption="Figure 8") +
-  scale_color_manual(values=c("#97ccc4ff","#de564d"))+
+  scale_color_manual(values=c("#97ccc4","#de564d"))+
   plotTheme()
 
 
@@ -843,7 +839,7 @@ Cross validation is one method of testing the generalizability of a model. We to
 
 library(caret)
 
-netsample <- sample_n(ride.panel, 1000)%>%
+netsample <- sample_n(ride.panel, 100000)%>%
   na.omit()
 
 fitControl <- trainControl(method = "cv", 
@@ -939,7 +935,7 @@ week_predictions2 %>%
 
 ```
 
-## <font face= "Georgia" span style="color: #97ccc4ff;">App Interface</span>
+# <font face= "Georgia" span style="color: #97ccc4;">App Interface</span>
 <font face= "Arial" span style="color: black;"></span>
 
 After fine-tuning the model, we attempted to viualize how the model would be integrated into the app. Using ggmap we used our model to create a heatmap which not only took in the density of blocks but also the number of predicted ending parking sessions at each block to identify hotspots. The following image shows the heatmap of predicted parking sessions ending for 1pm on Thursday. Using ggmap requires that you register a Google API. The API cannot be shared publicly, so in the following code, one would place their API in place of "your key." We performed the following code for several times of day.
@@ -1017,7 +1013,7 @@ The following image shows what this interface would like for an app user. Using 
 
 ![](C:\\Users\\Hannah\\Documents\\Penn\\Fall 2020\\CPLN-592\\Assignments\\Final Project\\CPLN592_Final\\Presentation Images\\heatmap_white.gif)
 
-## <font face= "Georgia" span style="color: #97ccc4ff;">Conclusion</span>
+# <font face= "Georgia" span style="color: #97ccc4;">Conclusion</span>
 <font face= "Arial" span style="color: black;"></span>
 
 Our app is likely to raise questions about the feasibility and ethics of allowing ordinary citizens, as opposed to government employees, to administer parking tickets. Before a strategy like this could be implemented, there would need to be a significant amount of planning and coordination with local governments. One of the likely areas of scrutiny would be safeguards against a situation where a car is flagged improperly by an app user for illegally parking when in reality a ticket is not deserved. The app would need to be built with a verification system that could cross check the date, time, and location of a submitted photo against local parking regulations to validate each instance of alleged illegal parking. Users who consistently submitted incorrect parking ticket submissions could also lose their privileges in the app. Another feature that would likely be of great interest to local governments is the feasibility, optics, and perhaps legality of awarding a percentage of the dollar amount of parking tickets back to a third party app provider, and in turn to app users. A financial compensation structure like this is not common and would likely require significant negotiation with government partners, whose approval would be necessary for implementation. Even if an app did promise to administer parking tickets at lower cost than the status quo of hiring parking enforcement officers, such an approach could very likely cause public uproar and political pressure against implementation. It is hard to predict how eager cities and their residents would be to embrace the approach we have proposed here, but we do think that there is an opportunity - whether with parking tickets or otherwise - to crowdsource certain government functions to the benefit of city governments and residents. In the same way that private sector companies like Uber and TaskRabbit have found ways to harness the power of freelance workers to great financial success, the public sector too should consider new and creative ways to deliver public services that new technologies have made possible. 
